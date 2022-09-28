@@ -22,6 +22,6 @@
 <hr>
 
 Eres el amor de mi vida, sí quieres volver a ver la página, dar [click aquí](https://nestor36.github.io/)
-[<p align="center"> <img src="/img/logi.gif" alt="web" /> </p>]
+<p align="center"> <img src="/img/logi.gif" alt="web" /> </p>
 
 ### <p align="center">😘💔💙💓💝💟💑 Mucha suerte en todos tus metas! ♥ 💚💗💘💖💞💋👄</p>
