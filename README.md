@@ -17,18 +17,6 @@
 
 <p align="center"> <img src="/imagesGithub/Love_06.jpeg"  /> </p>
 
-<p align="center"> <img src="/imagesGithub/4.png"  /> </p>
-
-<p align="center"> <img src="/imagesGithub/5.png" /> </p>
-
-<p align="center"> <img src="/imagesGithub/6.png" /> </p>
-
-<p align="center"> <img src="/imagesGithub/7.png" /> </p>
-
-<p align="center"> <img src="/imagesGithub/8.png" /> </p>
-
-<p align="center"> <img src="/imagesGithub/9.png" /> </p>
-
 <hr>
 
 <hr>
