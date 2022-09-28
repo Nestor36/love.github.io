@@ -24,4 +24,4 @@
 Eres el amor de mi vida, sí quieres ver algo bonito.. dar [click aquí](https://nestor36.github.io/)
 <p align="center"> <img src="/img/logi.gif" alt="web" /> </p>
 
-### <p align="center">😘💔💙💓💝💟💑 Mucha suerte en todos tus metas! ♥ 💚💗💘💖💞💋👄</p>
+### <p align="center">😘💔💙💓💝💟💑 Mucha suerte en todas tus metas! ♥ 💚💗💘💖💞💋👄</p>
