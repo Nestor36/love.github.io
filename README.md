@@ -15,19 +15,19 @@
 
 <p align="center"> <img src="/imagesGithub/Love_05.jpeg" alt="edit config.js" /> </p>
 
-<p align="center"> <img src="/imagesGithub/Love_06.jpeg" alt="support" /> </p>
+<p align="center"> <img src="/imagesGithub/Love_06.jpeg"  /> </p>
 
-<p align="center"> <img src="/imagesGithub/4.png" alt="support" /> </p>
+<p align="center"> <img src="/imagesGithub/4.png"  /> </p>
 
-<p align="center"> <img src="/imagesGithub/5.png" alt="setting" /> </p>
+<p align="center"> <img src="/imagesGithub/5.png" /> </p>
 
-<p align="center"> <img src="/imagesGithub/6.png" alt="setting" /> </p>
+<p align="center"> <img src="/imagesGithub/6.png" /> </p>
 
-<p align="center"> <img src="/imagesGithub/7.png" alt="setting" /> </p>
+<p align="center"> <img src="/imagesGithub/7.png" /> </p>
 
-<p align="center"> <img src="/imagesGithub/8.png" alt="setting" /> </p>
+<p align="center"> <img src="/imagesGithub/8.png" /> </p>
 
-<p align="center"> <img src="/imagesGithub/9.png" alt="setting" /> </p>
+<p align="center"> <img src="/imagesGithub/9.png" /> </p>
 
 <hr>
 
@@ -35,7 +35,7 @@
 
 ### <p align="center"> Te amo ♥ </p>
 
-Eres el amor de mi vida, sí quieres volver a ver la página, dar [click aquí](https://github.com/zukahai/Confess-Crush/issues/new)
+Eres el amor de mi vida, sí quieres volver a ver la página, dar [click aquí](https://nestor36.github.io/)
 [<p align="center"> <img src="/img/logi.gif" alt="web" /> </p>]
 
 ### <p align="center">😘💔💙💓💝💟💑 Mucha suerte en todos tus metas! ♥ 💚💗💘💖💞💋👄</p>
