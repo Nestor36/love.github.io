@@ -18,7 +18,7 @@
 <p align="center"> <img src="/imagesGithub/Love_06.jpeg"  /> </p>
 
 <hr>
-### <p align="center"> Te amo ♥ </p>
+<p align="center"> Te amo ♥ </p>
 <hr>
 
 Eres el amor de mi vida, sí quieres volver a ver la página, dar [click aquí](https://nestor36.github.io/)
