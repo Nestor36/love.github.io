@@ -19,5 +19,5 @@ const CONFIG = {
     mess: 'Lo sé 🥰. Te quiero mucho 😘😘',
     messDesc: ';) Te amo 01 August, recuerdas? jajaja te amo mi amoooor!!.',
     btnAccept: 'Okiiiii Acepto <3',
-    messLink: 'https://download1499.mediafire.com/7jl68r42gilg/f6b46jv75xle20g/Maily%E2%99%A5.pdf'
+    messLink: 'https://download1497.mediafire.com/mqyec4m86rqg/99el9iazd2diq7q/Maily%E2%99%A5.pdf'
 }
