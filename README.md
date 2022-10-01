@@ -22,6 +22,7 @@
 <hr>
 
 Eres el amor de mi vida, sí quieres ver algo bonito.. dar [click aquí](https://nestor36.github.io/)
+-- Recuerda que debes habilitar la música en la parte superior derecha : ) ♥ i love u
 <p align="center"> <img src="/img/logi.gif" alt="web" /> </p>
 
 ### <p align="center">😘💔💙💓💝💟💑 Mucha suerte en todas tus metas! ♥ 💚💗💘💖💞💋👄</p>
