@@ -1,0 +1,470 @@
+@font-face {
+font-family: "SansitaSwashed";
+src: url("../fonts/SansitaSwashed-VariableFont_wght.ttf") format("truetype");
+}
+@font-face {
+font-family: "Montserrat Bold";
+src: url("../fonts/Montserrat-Bold.ttf") format("truetype");
+}
+@font-face {
+font-family: "Montserrat ExtraBold";
+src: url("../fonts/Montserrat-ExtraBold.ttf") format("truetype");
+}
+@font-face {
+font-family: "Montserrat Black";
+src: url("../fonts/Montserrat-Black.ttf") format("truetype");
+}
+@font-face {
+font-family: "Montserrat Medium";
+src: url("../fonts/Montserrat-Medium.ttf") format("truetype");
+}
+@font-face {
+font-family: "Montserrat Semibold";
+src: url("../fonts/Montserrat-Semibold.ttf") format("truetype");
+}
+html{
+  background-color: #F9F8F7;
+  margin:0;
+  color: #54575a;
+
+}
+body{
+  font-family: "Trebuchet MS", sans-serif;
+  margin:0;
+
+
+}
+p {
+  font-family: Verdana, sans-serif;
+  padding: 10px
+}
+
+nav{
+  margin:0;
+  font-size:  20px;
+  font-weight: normal;
+  font-family: "Montserrat Bold",Verdana,sans-serif;
+  padding-top: 15px;
+  padding-bottom: 20px;
+
+}
+nav a{
+  text-decoration: none;
+}
+nav ul{
+  list-style-type: none;
+  padding: 10px;
+  margin:0;
+  color:#54575a;
+}
+h1{
+  background: #ffffff00;
+  font-family: "SansitaSwashed", cursive;
+  color:#54575a;
+  font-size: 30px;
+  margin:0;
+}
+h2{
+  font-family: "Montserrat Semibold", "Trebuchet MS", sans-serif;
+  font-size: 30px;
+  padding-left: 10px;
+  margin:0;
+  padding-bottom: 0px;
+}
+footer{
+  padding: 10px;
+  margin:0;
+  background:  #ffffff;
+  text-align: right;
+  color: #54575a;
+}
+a{
+  text-decoration: none;
+  color: inherit;
+}
+main{
+  max-width: 1500px;
+  margin-right: auto;
+  margin-left: auto;
+}
+div{
+  margin:0px;
+  padding:0px;
+}
+/* Classes*/
+/* Top classes */
+.head {
+  background:#ffffff;
+  color:#54575a;
+  padding-top:20px;
+  padding-left: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  width: 100%;
+  -moz-box-shadow: inset 0 0 3px #c9c9c9;
+  -webkit-box-shadow: inset 0 0 3px #c9c9c9;
+  box-shadow: inset 0 0 3px #c9c9c9;
+}
+.home h1{
+  font-size: 40px;
+  max-width: 1500px;
+  margin-right: auto;
+  margin-left: auto;
+}
+.horizontal{
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+}
+.horizontal h1{
+  flex:2;
+}
+.head a:hover{
+  color: #ff8f3e;
+}
+.horizontal nav {
+  flex:auto;
+  margin-top:0px;
+  padding-top: 0px;
+  padding-bottom: 0px;
+  margin-bottom: 0px;
+  margin-right: 20px;
+}
+
+.horizontal ul {
+  display: flex;
+  flex-direction: row;
+  text-align: center;
+}
+.horizontal nav li {
+   display: inline-block;
+   flex:1;
+}
+
+
+.introduction_menu{
+  max-width: 1500px;
+  margin-right: auto;
+  margin-left: auto;
+  display: flex;
+  flex-direction: row;
+  background:  inherit;
+  align-items: center;
+  justify-content: space-around;
+  padding-bottom: 20px;
+}
+
+nav.vert{
+  text-align: center;
+  flex:auto;
+
+}
+nav.vert ul {
+display: flex;
+flex-direction: column;
+color: #ffffff;
+ margin-left: 30px;
+ height: 9em;
+border-radius:  80px 0px 80px 0px ;
+-webkit-border-radius: 80px 0px 80px 0px ;
+-moz-border-radius: 80px 0px 80px 0px ;
+background:#27363B;
+min-width: 150px;
+
+}
+nav.vert li{
+  padding-top: 5px;
+  flex: auto;
+}
+nav.vert a:hover{
+  color: #EFA618;
+}
+
+.about{
+  flex:2;
+  border-radius: 0px 80px 0px 40px;
+  -webkit-border-radius: 0px 80px 0px 40px;
+  -moz-border-radius: 0px 80px 0px 40px;
+  background:#F4837D;
+  color:#ffffff;
+  margin-bottom: 20px;
+  max-width: 1500px;
+  margin-right: auto;
+  margin-left: auto;
+
+}
+.about h2{
+
+  padding-top: 10px;
+  padding-left:5px;
+  padding-top: 10px;
+  padding-bottom: 5px;
+  padding-right: 0px;
+  text-align: right;
+  margin-right: 50px;
+}
+.about .about_body{
+  margin:0px;
+  padding-bottom: 5px !important;
+  background: #EB4960;
+  border-top: 4px solid #e0b8d5;
+  border-radius:  0px 80px 0px 40px;
+  -webkit-border-radius:  0px 80px 0px 40px;
+  -moz-border-radius:  0px 80px 0px 40px;
+}
+.about_body p{
+  margin: 15px;
+}
+/* Photo blog specific classes */
+.blog_short{
+  margin-top: 10px;
+  padding: 5px;
+  max-width: 800px;
+  margin-left:auto;
+  margin-right: auto;
+  border-radius: 40px 90px 0px 40px;
+  -webkit-border-radius: 40px 90px 0px 40px;
+  -moz-border-radius: 40px 90px 0px 40px;
+  background:#99B998;
+  color: white;
+}
+.blog_short h2{
+  color: #373737;
+  padding-top: 20px;
+  padding-left: 20px;
+  font-family: sans-serif;
+}
+figure img{
+  margin-left: auto;
+  margin-right: auto;
+}
+figcaption{
+  border-radius: 20px 20px 20px 20px;
+  -webkit-border-radius:  20px 20px 20px 20px;
+  -moz-border-radius:  20px 20px 20px 20px;
+  padding: 5px;
+  background:#27363B;
+  color: white;
+}
+.blog_short footer{
+  background: inherit;
+}
+
+/* AMA specific classes */
+.FAQ{
+  max-width: 1000px;
+  margin-left:auto;
+  margin-right: auto;
+  border-radius: 40px 90px 0px 40px;
+  -webkit-border-radius: 40px 90px 0px 40px;
+  -moz-border-radius: 40px 90px 0px 40px;
+  background:#f49200;
+  color: white;
+
+}
+.FAQ h2{
+  text-align: center;
+  padding-top: 10px;
+}
+dl.qa{
+  border-radius: 0px 90px 0px 40px;
+  -webkit-border-radius: 0px 90px 0px 40px;
+  -moz-border-radius: 0px 90px 0px 40px;
+  background:#735C56;
+  padding: 20px;
+  padding-left: 10px;
+}
+dl.qa dt{
+  font-family: "Montserrat-Semibold", Tahoma, sans-serif;
+  margin-top: 20px;
+  font-size: 20px;
+}
+
+dl.qa dd{
+  font-family: "Montserrat-Medium", Tahoma, sans-serif;
+  margin-top: 18px;
+}
+
+
+.menu_container {
+  clear: both;
+  float: left;
+  overflow: hidden;
+  width: 100%;
+}
+#menu {
+  float: left;
+  left: 50%;
+  list-style-type: none;
+  margin: 0 auto;
+  padding: 0;
+  position: relative;
+}
+#menu li {
+  float: left;
+  position: relative;
+  right: 50%;
+}
+#menu a {
+  background: none repeat scroll 0 0 #000;
+  border: 1px solid #CCC;
+  color: #FFF;
+  display: block;
+  padding: 4px 10px;
+  text-decoration: none;
+  width: auto;
+}
+
+
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;700&display=swap');
+/*Còdigos universales de la pàgina*/
+
+/*Còdigo opcional - Fondo de la pàgina*/
+
+/*---*/
+
+.modal{
+	position: fixed;
+	top: 0;
+	left: 0;
+	background: rgba(0, 0, 0, 0);
+	transition: all 500ms ease;
+	opacity: 0;
+	visibility: hidden;
+}
+#btn-modal:checked ~ .modal{
+	opacity: 1;
+	visibility: visible;
+} 
+.contenedor{
+	width: 400px;
+	height: 300px;
+	margin: auto;
+	background: rgba(255, 255, 255, 0);
+	box-shadow: 1px 7px 25px rgba(0, 0, 0, 0);
+	transition: all 500ms ease;
+	position: relative;
+	transform: translateY(-30%);
+}
+#btn-modal:checked ~ .modal .contenedor{
+	transform: translateY(0%);
+} 
+.contenedor header{
+	padding: 10px;
+	background: #db8046;
+	color: rgba(255, 255, 255, 0);
+}
+.contenedor label{
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	color: #fff;
+	font-size: 15px;
+	cursor: pointer;
+}
+.contenido{
+	width: 100%;
+	padding: 10px; 
+}
+.contenido h3{
+	margin-bottom: 10px;
+}
+.contenido p{
+	margin-bottom: 7px;
+}
+#btn-modal{
+	display: none;
+}
+.lbl-modal{
+	background: rgba(255, 255, 255, 0);
+	padding: 10px 15px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+@media only screen and (min-width:320px) and (max-width:768px){
+	.contenedor{
+		width: 95%;
+	}
+}
+
+
+
+/* Common */
+
+
+
+/* Player */
+.player {
+    min-width: 320px;
+    background-image: linear-gradient(black, gray);
+    border-radius: 1rem;
+    padding: 2rem;
+    color: white;
+    box-shadow: 2px 2px 3px black;
+}
+
+/* Title */
+.title {
+    margin-top: 0;
+    text-align: center;
+}
+
+/* Cover */
+.cover {
+    width: 128px;
+    height: auto;
+    border-radius: .3rem;
+    display: block;
+    margin: 0 auto 1rem auto;
+}
+
+/* Progress */
+.progress-container {
+    height: .6rem;
+    background-color: lightgray;
+    margin-bottom: 1rem;
+}
+
+.progress {
+    background-color: goldenrod;
+    width: 0;
+    height: 100%;
+}
+
+/* Controls */
+.controls {
+    display: flex;
+    justify-content: space-evenly;
+    margin-bottom: 1rem;
+}
+
+.controls button {
+    background-color: transparent;
+    border: none;
+}
+
+.controls i {
+    font-size: 1.7rem;
+    color: white;
+}
+
+/* Songs */
+.songs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.songs li {
+    margin-bottom: 1rem;
+}
+
+.songs a {
+    color: lightgray;
+    text-decoration: none;
+}
+
+.songs a.active {
+    color: white;
+    font-weight: bold;
+}

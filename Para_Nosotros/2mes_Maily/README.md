@@ -1,5 +1,5 @@
 ## <p align="center"> 01 August - Gux y Cielo </p>
-<p align="center"> <img src="/imagesGithub/Love_01.png" alt="bg" /> </p>
+<p align="center"> <img src="/Para_Nosotros/2mes_Maily/imagesGithub/Love_01.png" alt="bg" /> </p>
 
 <hr>
 
