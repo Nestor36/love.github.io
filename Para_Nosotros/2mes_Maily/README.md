@@ -21,7 +21,7 @@
 <p align="center"> Te amo ♥ </p>
 <hr>
 
-Eres el amor de mi vida, sí quieres ver algo bonito.. dar [click aquí](https://nestor36.github.io//Para_Nosotros/2mes_Maily)
+Eres el amor de mi vida, sí quieres ver algo bonito.. dar [click aquí](https://nestor36.github.io/Para_Nosotros/2mes_Maily)
 <br>Recuerda que debes habilitar la música en la parte superior derecha : ) ♥ i love u
 <p align="center"> <img src="/Para_Nosotros/2mes_Maily/img/logi.gif" alt="web" /> </p>
 
