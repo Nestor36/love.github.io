@@ -1,0 +1,86 @@
+<html>
+    <body background="https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/Computer-screen-code-glitch-animation-gif-background-free.gif/1280px-Computer-screen-code-glitch-animation-gif-background-free.gif">
+<style>
+
+#form-ci
+{
+    border: 50px solid;
+    position: relative;
+    left: 30px;
+    top: 250px;
+}
+
+#texto-izq
+{
+    position: relative;
+    left: 30px;
+    top: 250px;
+}
+
+table
+{
+    border: 2px solid #35A461;
+    background-color: #3ABAF1;
+}
+
+input[type=text], input[type=password]
+{
+    width: 100%;
+    padding: 8px 20px;
+    border: 2px solid #ccc;
+    box-sizing: border-box;
+}
+
+img
+{
+    width: 100px;
+    height: 100px;
+}
+
+label{
+    color: black;
+    font-size: 14px;
+    font-weight: bold;
+    font-family: arial;
+}
+
+input[type=submit]
+{
+    background-color: #1C94C8;
+    color:white;
+    padding: 8px 10px;
+    margin: 8px 0px;
+    border: solid;
+    cursor: pointer;
+    width: 40%;
+}
+
+#cuadro-login
+{
+    background-color: #1C94C8;
+    padding-bottom: 5px;
+    padding-top: 5px;
+}
+
+</style>
+
+    
+    <div>
+        <center>
+            <form method="post" action="login.php" >
+                <div id="texot-izq">
+                    <a>BIENVENIDO </a>
+                </div>
+                <table id="form-ci">
+                    <tr><td align="center" colspan="2" id="cuadro-login"><label>Login</label></td></tr>
+                    <tr><td align="center" rowspawn="5"><img src="https://i.pinimg.com/originals/7e/5c/07/7e5c0701fba480e5c59ccf400ea18e55.gif"><br><label>Usuario</label></td></tr>
+                    <tr><td><input type="text" name="data-usuario"></td></tr>
+                    <tr><td align="center" rowspawn="5"><label>Password</label></td></tr>
+                    <tr><td><input type="password" name="data-password"></td></tr>
+                    <tr><td><input type="submit" value="Ingresar"></td></tr>
+                </table>
+            </form>
+        </center>
+    </div>
+</body>
+</html>
