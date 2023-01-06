@@ -1,1 +1,0 @@
-# Maily y Jair, Nuestra Galería.
