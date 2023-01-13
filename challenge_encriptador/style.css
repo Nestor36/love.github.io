@@ -67,6 +67,11 @@ body{
     background: transparent;
 }
 
+.text-input:empty::before {
+    position: absolute;
+  }
+
+
 #imgDer{
     margin-left: 2%;
     margin-top: 20%;
@@ -160,14 +165,6 @@ body{
     text-transform: uppercase;
 
 }
-@keyframes waviy {
-    0%,40%,100% {
-    transform: translateY(0)
-}
-    20% {
-    transform: translateY(-20px)
-    }
-}
 
 .enviar{
     transition: 1s all;
@@ -182,4 +179,25 @@ body{
     0 0 0.8rem #1365fe,
     0 0 2.8rem #1365fe,
     inset 0 0 1.3rem #1365fe00;
+}
+
+.rgbxd{
+    animation: color-change 1s infinite;
+}
+
+@keyframes waviy {
+    0%,40%,100% {
+    transform: translateY(0)
+    }
+    20% {
+    transform: translateY(-20px)
+    }
+}
+  
+@keyframes color-change {
+    0% { color: red; }
+    15% { color: green; }
+    50% { color: blue; }
+    75% { color: black; }
+    100% { color: red; }
 }
