@@ -1,6 +1,5 @@
 
 
-
 function encriptar() {
 
     var texto = document.getElementById("inputTexto").value.toLowerCase();
@@ -21,12 +20,13 @@ function encriptar() {
         if (document.getElementById("imgDer").style.display = "none"){
             document.getElementById("imgDer").style.display = "";
             imgDer.src = "https://pa1.narvii.com/7241/c18637280c5307f681bd279b11e292429afa5fc5r1-248-500_hq.gif";    
-            imgDer.style = "width: 300px;";
+            imgDer.style = "width: 293px;";
         }
         document.getElementById("texto").style.display = "none";
         document.getElementById("texto2").innerHTML = txtCifrado;
         document.getElementById("copiar").style.display = "show";
         document.getElementById("copiar").style.display = "inherit";
+        $.notify("Texto encriptado correctamente!", "success");
     }
     else{
         document.getElementById("imgDer").style.display = "none";
@@ -35,6 +35,7 @@ function encriptar() {
         imgDer.style = "";   
         document.getElementById("texto").style.display = "";
         document.getElementById("copiar").style.display = "none";
+        $.notify("No hubo nada que encriptar..", "warn");
 
     }
     
@@ -70,6 +71,7 @@ function desencriptar() {
         document.getElementById("texto2").innerHTML = txtCifrado;
         document.getElementById("copiar").style.display = "show";
         document.getElementById("copiar").style.display = "inherit";
+        $.notify("Texto desencriptado correctamente!", "success");
     }
     else{
         document.getElementById("imgDer").style.display = "none";
@@ -78,6 +80,8 @@ function desencriptar() {
         imgDer.style = "";
         document.getElementById("texto").style.display = "";
         document.getElementById("copiar").style.display = "none";
+        $.notify("No hubo nada que desencriptar..", "warn");
+
 
     }
 }
@@ -87,7 +91,8 @@ function copiar(){
     var contenido = document.querySelector("#texto2");
     contenido.select();
     document.execCommand("copy");
-    alert("se copió!")    
+    $.notify("Se copió exitosamente!", "success");
+    //alert("se copió!")    
 
 }
 
