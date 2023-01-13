@@ -15,6 +15,7 @@ function encriptar() {
         var txtCifrado = txtCifrado.replace(/s/igm,"Ü");
         var txtCifrado = txtCifrado.replace(/h/igm,"♦");
         var txtCifrado = txtCifrado.replace(/á/igm,"¤");
+        var txtCifrado = txtCifrado.replace(/d/igm,"◙");
 
 
         if (document.getElementById("imgDer").style.display = "none"){
@@ -55,6 +56,8 @@ function desencriptar() {
         var txtCifrado = txtCifrado.replace(/Ü/igm,"s");
         var txtCifrado = txtCifrado.replace(/♦/igm,"h");
         var txtCifrado = txtCifrado.replace(/¤/igm,"á");
+        var txtCifrado = txtCifrado.replace(/◙/igm,"d");
+
 
 
         if (document.getElementById("imgDer").style.display = "none"){
