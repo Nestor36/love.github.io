@@ -62,8 +62,8 @@ function desencriptar() {
 
         if (document.getElementById("imgDer").style.display = "none"){
             document.getElementById("imgDer").style.display = "";
-            imgDer.src = "https://64.media.tumblr.com/e17dde85b9a2a389544bddcd3f14a02c/4d9049bb7e85482d-32/s500x750/208a32831703f7c4f3ea4aa258e196d161d81400.gifv";    
-            imgDer.style = "width: 500px; height: 605px;"
+            imgDer.src = "https://pa1.narvii.com/6540/b76e54d5fba28047def75b4e17ed447433050667_hq.gif";    
+            imgDer.style = "width: 290px; height: 605px;"
         }
 
         document.getElementById("texto").style.display = "none";
