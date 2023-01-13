@@ -20,7 +20,9 @@ function encriptar() {
         if (document.getElementById("imgDer").style.display = "none"){
             document.getElementById("imgDer").style.display = "";
             imgDer.src = "https://pa1.narvii.com/7241/c18637280c5307f681bd279b11e292429afa5fc5r1-248-500_hq.gif";    
-            imgDer.style = "width: 293px;";
+            //imgDer.style = "width: 293px;";
+            imgDer.style = "margin-top: -25%; width: 30%;";
+
         }
         document.getElementById("texto").style.display = "none";
         document.getElementById("texto2").innerHTML = txtCifrado;
@@ -64,7 +66,9 @@ function desencriptar() {
         if (document.getElementById("imgDer").style.display = "none"){
             document.getElementById("imgDer").style.display = "";
             imgDer.src = "https://pa1.narvii.com/6540/b76e54d5fba28047def75b4e17ed447433050667_hq.gif";    
-            imgDer.style = "width: 290px; height: 605px;"
+            //imgDer.style = "width: 290px; height: 605px;"
+            imgDer.style = "margin-top: -25%;";
+
         }
 
         document.getElementById("texto").style.display = "none";
