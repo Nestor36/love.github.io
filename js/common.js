@@ -75,8 +75,6 @@ $(document).ready(function() {
   });
 
 
-
-  
   /* =======================
   // LazyLoad Images
   ======================= */

@@ -2,7 +2,7 @@
 layout: post
 title: Ataque format string
 author: c4rta
-date: 2023-11-27
+date: 2022-07-29
 #categories: [Explotacion binaria]
 tags: [Explotacion Binaria, format string]
 image: /assets/img/format-string/waifu.png
