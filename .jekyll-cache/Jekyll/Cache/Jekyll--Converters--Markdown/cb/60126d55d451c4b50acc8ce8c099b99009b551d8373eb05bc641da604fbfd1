@@ -1,0 +1,85 @@
+I"�<p>En este desafio explotaremos un SQLi donde hay que evadir un par de filtros para conseguir la flag</p>
+
+<p class="lead">Para este desafio tenemos que hacer bypass de varios filtros usando sql injection, el SGBD es sqlite y el usuario para todos los casos es <code class="language-plaintext highlighter-rouge">admin</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">http://jupiter.challenges.picoctf.org:41560/</code> –&gt; Pagina vulnerable</p>
+
+<p><code class="language-plaintext highlighter-rouge">http://jupiter.challenges.picoctf.org:41560/filter.php</code> –&gt; Filtro de cada round</p>
+
+<h2 id="round-1">Round 1</h2>
+
+<p>El primer filtro de debemos de evadir es <code class="language-plaintext highlighter-rouge">or</code>, al llenar los campos y presionar en <code class="language-plaintext highlighter-rouge">sign in</code> vemos como nos muestra la consulta, la cual es:</p>
+
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='admin' AND password='admin'</code></p>
+
+<p>Aun que no hayamos conseguido iniciar, podemos ver que se esta usando el operador <code class="language-plaintext highlighter-rouge">AND</code>, y <code class="language-plaintext highlighter-rouge">AND</code> permite usar multiples condiciones en un <code class="language-plaintext highlighter-rouge">WHERE</code>, al usar <code class="language-plaintext highlighter-rouge">AND</code>, se asume que que toda la condicion es verdadera, cuando cada condicion sea verdadera.</p>
+
+<p>Ademas debemos de evadir <code class="language-plaintext highlighter-rouge">OR</code>, que lo que hace es combinar varias condiciones en un <code class="language-plaintext highlighter-rouge">WHERE</code>, y al usarlo se asume que la condicion completa es verdadera cuando cualquiera de las condiciones sea verdadera.</p>
+
+<p>Asi que como sabemos que el usuario debe ser <code class="language-plaintext highlighter-rouge">admin</code>, lo que podemos hacer es escapar la consulta desde el <code class="language-plaintext highlighter-rouge">AND</code> para que toda la condicion sea verdadera y asi se cumpliria la condicion <code class="language-plaintext highlighter-rouge">AND</code> ya que ahora la contraseña es igual a lo que le pasemos como input, <code class="language-plaintext highlighter-rouge">0R</code> ya que esta cumpliendo una condicion que es que el usuario sea <code class="language-plaintext highlighter-rouge">admin</code> y ademas omitimos la contraseña, esto lo hacemos comentando desde <code class="language-plaintext highlighter-rouge">AND</code>, y queda algo asi:</p>
+
+<p>usuario: <code class="language-plaintext highlighter-rouge">admin'--</code>
+contra: –&gt; esto puede ser lo que sea</p>
+
+<h3 id="round-2">Round 2</h3>
+
+<p>En este round no podemos usar <code class="language-plaintext highlighter-rouge">OR</code> y <code class="language-plaintext highlighter-rouge">--</code>, pero realmente es lo mismo que el anterior, ya que en sqlite hay dos tipos de comentario, uno es <code class="language-plaintext highlighter-rouge">--</code> y otro es <code class="language-plaintext highlighter-rouge">/*</code> (la explicacion es la misma).</p>
+
+<p>usuario: <code class="language-plaintext highlighter-rouge">admin' /*</code></p>
+
+<p>Y otra manera de solucionarlo es acortar la consulta, esto para que solo haya una condicion, es decir que el usuario sea admin, la consulta queda asi</p>
+
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='admin';</code></p>
+
+<p>Y el input queda asi:</p>
+
+<p>usuario: <code class="language-plaintext highlighter-rouge">admin;</code></p>
+
+<h3 id="round-3">Round 3</h3>
+
+<p>Ahora no podemos usar <code class="language-plaintext highlighter-rouge">OR</code>, espacios y <code class="language-plaintext highlighter-rouge">--</code>, pero esto no importa ya que aun podemos acortar la consulta como en el round pasado y todo queda igual, asi:</p>
+
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='admin';</code></p>
+
+<p>El input queda asi:</p>
+
+<p>usuario: <code class="language-plaintext highlighter-rouge">admin';</code></p>
+
+<h2 id="round-4">Round 4</h2>
+
+<p>Ahora no podemos usar <code class="language-plaintext highlighter-rouge">OR</code>, espacios, <code class="language-plaintext highlighter-rouge">--</code> y la palabra <code class="language-plaintext highlighter-rouge">admin</code>.</p>
+
+<p>La manera mas evidente de resolverlo es separar la palabra admin y luego concaternarla, esto lo podemos hacer con <code class="language-plaintext highlighter-rouge">||</code> y luego comentar todo lo demas, de esta manera:</p>
+
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='adm'||'in'/*</code></p>
+
+<p>Y como input le podemos pasar esto</p>
+
+<p><code class="language-plaintext highlighter-rouge">adm'||'in'/*</code></p>
+
+<p>Otra manera de resolverlo es usando el operador <code class="language-plaintext highlighter-rouge">UNION</code> y la consulta quedaria algo asi:</p>
+
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='c4rta'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;</code></p>
+
+<p>Esto hace dos consultas, la primera es:</p>
+
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='c4rta'</code></p>
+
+<p>Y la segunda:</p>
+
+<p><code class="language-plaintext highlighter-rouge">SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;</code></p>
+
+<p><code class="language-plaintext highlighter-rouge">UNION</code> combina los SELECT, <code class="language-plaintext highlighter-rouge">/**/</code> entre todas las palabras representan los espacios en blanco. Y tenemos que incluir la parte LIMIT 1 porque generalmente en una base de datos, el administrador es la primera entrada de la tabla y con esta consulta, simplemente recuperamos la primera línea, que en este caso es el administrador, entonces nuestro input queda:</p>
+
+<p>usuario: <code class="language-plaintext highlighter-rouge">c4rta'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;</code></p>
+
+<h2 id="round-5">Round 5</h2>
+
+<p>Aun que ahora ya no podemos usar el <code class="language-plaintext highlighter-rouge">UNION</code> y todos los demas filtros anteriores, podemos separar la palabra <code class="language-plaintext highlighter-rouge">admin</code> y luego concatenarla, osea que podemos usar uno de los payloads de round 4 y entonces queda asi:</p>
+
+<p>usuario: <code class="language-plaintext highlighter-rouge">adm'||'in'/*</code></p>
+
+<p>Y la flag es: <code class="language-plaintext highlighter-rouge">picoCTF{y0u_m4d3_1t_275cea1159781d5b3ef3f57e70be664a}</code></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

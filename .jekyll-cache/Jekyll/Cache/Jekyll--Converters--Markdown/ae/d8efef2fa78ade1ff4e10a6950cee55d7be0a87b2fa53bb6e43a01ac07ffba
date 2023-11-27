@@ -1,0 +1,178 @@
+I"�O<p class="lead">Este desafio es una introduccion una tecnica llamada Use-After-Free la cual basicamente ocurre cuando se hace referencia a la memoria despues de que haya sido liberada</p>
+
+<h2 id="analizando-el-binario-y-explotacion">Analizando el binario y explotacion</h2>
+
+<p>El codigo que nos proveen es este:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;stdlib.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/types.h&gt;
+#include &lt;stdio.h&gt;
+</span> 
+<span class="k">struct</span> <span class="n">auth</span> <span class="p">{</span>
+  <span class="kt">char</span> <span class="n">name</span><span class="p">[</span><span class="mi">32</span><span class="p">];</span>
+  <span class="kt">int</span> <span class="n">auth</span><span class="p">;</span>
+<span class="p">};</span>
+ 
+<span class="k">struct</span> <span class="n">auth</span> <span class="o">*</span><span class="n">auth</span><span class="p">;</span>
+<span class="kt">char</span> <span class="o">*</span><span class="n">service</span><span class="p">;</span>
+ 
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span><span class="n">argv</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="kt">char</span> <span class="n">line</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span>
+ 
+  <span class="k">while</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="p">{</span>
+      <span class="n">printf</span><span class="p">(</span><span class="s">"[ auth = %p, service = %p ]</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">auth</span><span class="p">,</span> <span class="n">service</span><span class="p">);</span>
+ 
+      <span class="k">if</span><span class="p">(</span><span class="n">fgets</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">line</span><span class="p">),</span> <span class="n">stdin</span><span class="p">)</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">)</span> <span class="k">break</span><span class="p">;</span>
+       
+      <span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"auth "</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="n">auth</span> <span class="o">=</span> <span class="n">malloc</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="n">auth</span><span class="p">));</span>
+          <span class="n">memset</span><span class="p">(</span><span class="n">auth</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">auth</span><span class="p">));</span>
+          <span class="k">if</span><span class="p">(</span><span class="n">strlen</span><span class="p">(</span><span class="n">line</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">31</span><span class="p">)</span> <span class="p">{</span>
+              <span class="n">strcpy</span><span class="p">(</span><span class="n">auth</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">line</span> <span class="o">+</span> <span class="mi">5</span><span class="p">);</span>
+          <span class="p">}</span>
+      <span class="p">}</span>
+      <span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"reset"</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="n">free</span><span class="p">(</span><span class="n">auth</span><span class="p">);</span>
+      <span class="p">}</span>
+      <span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"service"</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="n">service</span> <span class="o">=</span> <span class="n">strdup</span><span class="p">(</span><span class="n">line</span> <span class="o">+</span> <span class="mi">7</span><span class="p">);</span>
+      <span class="p">}</span>
+      <span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"login"</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="k">if</span><span class="p">(</span><span class="n">auth</span><span class="o">-&gt;</span><span class="n">auth</span><span class="p">)</span> <span class="p">{</span>
+              <span class="n">printf</span><span class="p">(</span><span class="s">"you have logged in already!</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+          <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+              <span class="n">printf</span><span class="p">(</span><span class="s">"please enter your password</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+          <span class="p">}</span>
+      <span class="p">}</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>Vemos que el programa se queda en un bucle infinito gracias a <code class="language-plaintext highlighter-rouge">while(1)</code>, ademas recibe 4 comandos: auth, reset, service y login.</p>
+
+<p>Primeramente se esta declarando una estructuta llamada <code class="language-plaintext highlighter-rouge">auth</code> la cual tiene dos variables:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">struct</span> <span class="n">auth</span> <span class="p">{</span>
+  <span class="kt">char</span> <span class="n">name</span><span class="p">[</span><span class="mi">32</span><span class="p">];</span>
+  <span class="kt">int</span> <span class="n">auth</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre></div></div>
+<p>En la cual <code class="language-plaintext highlighter-rouge">name</code> es una arreglo de caracteres de 32 bytes.</p>
+
+<p>De ahi nos vamos al primer if:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"auth "</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="n">auth</span> <span class="o">=</span> <span class="n">malloc</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="n">auth</span><span class="p">));</span>
+          <span class="n">memset</span><span class="p">(</span><span class="n">auth</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">auth</span><span class="p">));</span>
+          <span class="k">if</span><span class="p">(</span><span class="n">strlen</span><span class="p">(</span><span class="n">line</span> <span class="o">+</span> <span class="mi">5</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">31</span><span class="p">)</span> <span class="p">{</span>
+              <span class="n">strcpy</span><span class="p">(</span><span class="n">auth</span><span class="o">-&gt;</span><span class="n">name</span><span class="p">,</span> <span class="n">line</span> <span class="o">+</span> <span class="mi">5</span><span class="p">);</span>
+          <span class="p">}</span>
+      <span class="p">}</span>
+</code></pre></div></div>
+<p>En el cual si el input es <code class="language-plaintext highlighter-rouge">auth</code>, le asignaremos memoria con <code class="language-plaintext highlighter-rouge">malloc()</code>, y el resto del input es tomado por la variable <code class="language-plaintext highlighter-rouge">name</code> de <code class="language-plaintext highlighter-rouge">struct auth</code></p>
+
+<p>En el segundo if:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"reset"</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="n">free</span><span class="p">(</span><span class="n">auth</span><span class="p">);</span>
+      <span class="p">}</span>
+</code></pre></div></div>
+<p>Lo que hace aqui es liberar memoria de el objeto <code class="language-plaintext highlighter-rouge">auth</code></p>
+
+<p>En el tercer if:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"service"</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="n">service</span> <span class="o">=</span> <span class="n">strdup</span><span class="p">(</span><span class="n">line</span> <span class="o">+</span> <span class="mi">7</span><span class="p">);</span>
+      <span class="p">}</span>
+</code></pre></div></div>
+<p>Lo que hace es tomar el resto de la entrada y le asigna memoria con <code class="language-plaintext highlighter-rouge">strdup</code>, la cual esta devuelve un puntero</p>
+
+<p>Y el ultimo if:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span><span class="p">(</span><span class="n">strncmp</span><span class="p">(</span><span class="n">line</span><span class="p">,</span> <span class="s">"login"</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+          <span class="k">if</span><span class="p">(</span><span class="n">auth</span><span class="o">-&gt;</span><span class="n">auth</span><span class="p">)</span> <span class="p">{</span>
+              <span class="n">printf</span><span class="p">(</span><span class="s">"you have logged in already!</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+          <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+              <span class="n">printf</span><span class="p">(</span><span class="s">"please enter your password</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+          <span class="p">}</span>
+      <span class="p">}</span>
+</code></pre></div></div>
+
+<p>Lo que hace es realizar una verificacion si el <code class="language-plaintext highlighter-rouge">auth struct</code> tiene un valor igual que 0.</p>
+
+<p>Para resolver el desafio lo que hacer que hacer es pasar la condición de que auth-&gt;auth sea un valor que no sea cero, ya que en ninguna parte del código se le asigna un valor a auth-&gt;auth.</p>
+
+<p>Asi que para resolver esta desafio tenemos que mostrar: <code class="language-plaintext highlighter-rouge">you have logged in already!</code></p>
+
+<p>Aqui lo que se me ocurre hacer es asignar memoria con <code class="language-plaintext highlighter-rouge">auth</code>, luego liberar le memoria con <code class="language-plaintext highlighter-rouge">reset</code> y despues dar un input usando el comando <code class="language-plaintext highlighter-rouge">service</code>, lo suficientemente grande para para sobreescribir <code class="language-plaintext highlighter-rouge">auth-&gt;auth</code>, esto hara que el programa intente acceder a <code class="language-plaintext highlighter-rouge">auth struct</code> pero ahora su memoria se libero y luego se sobreescribio con lo que le metimos con <code class="language-plaintext highlighter-rouge">service</code> y ahora <code class="language-plaintext highlighter-rouge">auth-&gt;auth</code> es diferente de 0</p>
+
+<h3 id="visualizandolo-en-gdb">Visualizandolo en gdb</h3>
+
+<p>Lo primero es ver el contenido de la memoria de auth cuando tiene un valor asignado a <code class="language-plaintext highlighter-rouge">auth-&gt;name</code>, osea cuando se ingresa el comando <code class="language-plaintext highlighter-rouge">auth</code></p>
+
+<p>Esto lo hare poniendo en breakpoint en <code class="language-plaintext highlighter-rouge">0x08048a01</code> que es donde se hace lo que dije arriba</p>
+
+<p>Primeramente podemos ver como en <code class="language-plaintext highlighter-rouge">EAX</code> se almacena nuestro input:</p>
+
+<p><code class="language-plaintext highlighter-rouge">*EAX  0x804c818 ◂— 'c4rta\n'</code></p>
+
+<p>Y si mostramos el contenido del registro <code class="language-plaintext highlighter-rouge">EAX</code> podemos ver algo como esto:</p>
+
+<p><code class="language-plaintext highlighter-rouge">eax            0x804c818           134531096</code></p>
+
+<p>La memoria asignada por <code class="language-plaintext highlighter-rouge">malloc()</code> esta ubicada en <code class="language-plaintext highlighter-rouge">0x804c818</code> el cual se guardo en <code class="language-plaintext highlighter-rouge">EAX</code> que es el valor de retorno de <code class="language-plaintext highlighter-rouge">malloc()</code> que contiene nuestro input</p>
+
+<p>Sin embargo, si mostramos unos cuantos bytes por debajo del valor de retorno de <code class="language-plaintext highlighter-rouge">malloc()</code>, podemos ver esto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pwndbg&gt; x/20xb $eax-8 
+0x804c810:	0x00	0x00	0x00	0x00	0x11	0x00	0x00	0x00
+0x804c818:	0x63	0x34	0x72	0x74	0x61	0x0a	0x00	0x00
+0x804c820:	0x00	0x00	0x00	0x00
+</code></pre></div></div>
+
+<p>Aqui quiero destacar el <code class="language-plaintext highlighter-rouge">0x11</code>, el encabezado del <code class="language-plaintext highlighter-rouge">chunk</code> muestra que solo hay 16 bytes asignados (<code class="language-plaintext highlighter-rouge">0x00000011</code>), donde el bit LS es un indicador que indica que se ha asignado el fragmento anterior, (esto se conoce como la flag <code class="language-plaintext highlighter-rouge">PREV_INUSE</code>), en lugar de los bytes necesario para <code class="language-plaintext highlighter-rouge">auth struct</code> , esto es por que en la línea 25, la llamada <code class="language-plaintext highlighter-rouge">malloc()</code> obtiene el tamaño del puntero con el mismo nombre que la estructura, y debido a que cada puntero tiene un tamaño de 4 bytes, <code class="language-plaintext highlighter-rouge">malloc()</code> asigna 4 bytes más los 8 bytes adicionales para el encabezado.</p>
+
+<p>Ademas tambien podemos ver nuestro input el cual es:</p>
+
+<p><code class="language-plaintext highlighter-rouge">0x63	0x34	0x72	0x74	0x61</code></p>
+
+<p>Ahora es momento de saber que pasa si hacemos un <code class="language-plaintext highlighter-rouge">reset</code> y despues un <code class="language-plaintext highlighter-rouge">login</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pwndbg&gt; x /20xb $eax-8 
+0x804c000:  0x00    0x00    0x00    0x00    0x11    0x00    0x00    0x00 
+0x804c008:  0x00    0x00    0x00    0x00    0x0a    0x00    0x00    0x00 
+0x804c010:  0x00    0x00    0x00    0x00    0xf1
+</code></pre></div></div>
+<p>Aqui ya se puso interesante la cosa, el objeto del heap esta alli (de <code class="language-plaintext highlighter-rouge">0x11</code> a <code class="language-plaintext highlighter-rouge">0xf1</code> el cual <code class="language-plaintext highlighter-rouge">0xf1</code> es llamado <code class="language-plaintext highlighter-rouge">top chunk</code>), pero nuestro input ya no esta, entonces ahora veremos que pasa si creamos un nuevo objeto en el heap usando <code class="language-plaintext highlighter-rouge">service</code> pero pasandole un tamaño mas grande que 16 bytes, esto lo podemos hacer ya que la memoria despues de <code class="language-plaintext highlighter-rouge">free()</code> esta disponible para volverla a asignar:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[ auth = 0x804c818, service = (nil) ]
+service AAAAAAAAAAAAAAAAAA
+</code></pre></div></div>
+
+<p>Podemos ver como se asigno en el espacio anterior, osea en <code class="language-plaintext highlighter-rouge">auth</code>, esto es ya que tiene la misma direccion: <code class="language-plaintext highlighter-rouge">0x804c818</code>, pero eso no es todo, tambien logramos sobreescribir <code class="language-plaintext highlighter-rouge">auth-&gt;auth</code> gracias a <code class="language-plaintext highlighter-rouge">service</code> , esto lo podemos ver si mostramos unos cuantos bytes desde <code class="language-plaintext highlighter-rouge">0x804c818</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pwndbg&gt; x /64xb 0x804c818
+0x804c818:	0x20	0x61	0x61	0x61	0x61	0x61	0x61	0x61
+0x804c820:	0x61	0x61	0x61	0x61	0x61	0x61	0x61	0x61
+0x804c828:	0x61	0x61	0x61	0x0a	0x00	0x00	0x00	0x00
+0x804c830:	0x00	0x00	0x00	0x00	0xd1	0x07	0x00	0x00
+0x804c838:	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00
+0x804c840:	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00
+0x804c848:	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00
+0x804c850:	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00
+</code></pre></div></div>
+<p>Podemos ver como en la direccion <code class="language-plaintext highlighter-rouge">0x804c828</code> que es la de <code class="language-plaintext highlighter-rouge">auth-&gt;auth</code> ahora contiene <code class="language-plaintext highlighter-rouge">0x61	0x61	0x61</code> de mas</p>
+
+<p>Y ahora aun que el objeto del heap se libero, el puntero a <code class="language-plaintext highlighter-rouge">auth-&gt;auth</code> no se anulo, y aun se usa, y dará como resultado un valor diferente de 0, asi que si continuamos la ejecucion vemos como ya obtuvimos la flag:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pwndbg&gt; c
+Continuing.
+you have logged in already!
+</code></pre></div></div>
+
+<p>Y si fue como explotamos un UAF basico aprovechandonos de una sobreescritura con <code class="language-plaintext highlighter-rouge">service</code> para usar usar un <code class="language-plaintext highlighter-rouge">chunk</code> liberado anteriormente el cual ahora es llamado <code class="language-plaintext highlighter-rouge">free chunk</code></p>
+
+<p>Eso ha sido todo, y tranquilo si no llegaste a entender lo que pasaba, por que ni yo ni nadie entiende estas cosas a la primera, pero con tiempo y diciplina se puede lograr. Realmente no me gustaria que te frustraras por algo asi, tu puedes. Gracias por leer ❤</p>
+:ET

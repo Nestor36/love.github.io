@@ -1,0 +1,157 @@
+I"�:<p class="lead">Desarrollaremos un programa en C el cual inyectara una shellcode usando la syscall mmap()</p>
+
+<h2 id="mmap">mmap</h2>
+
+<p>mmap es una syscall y una funcion incorporada en el header <code class="language-plaintext highlighter-rouge">sys/mman.h</code> la cual permite asignar o mapear memoria dentro del espacio de direcciones virtuales de un proceso, mmap regresa un puntero void (void *), la estructura es:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="o">*</span><span class="nf">mmap</span><span class="p">(</span><span class="kt">void</span> <span class="o">*</span><span class="n">addr</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">length</span><span class="p">,</span> <span class="kt">int</span> <span class="n">prot</span><span class="p">,</span> <span class="kt">int</span> <span class="n">flags</span><span class="p">,</span> <span class="kt">int</span> <span class="n">fd</span><span class="p">,</span> <span class="kt">off_t</span> <span class="n">offset</span><span class="p">);</span>
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p><strong>void *addr</strong>: Es la direccion desde donde se va a asignar la memoria, esta direccion se la podemos asignar manualmente, o en todo caso de que le pogamos <code class="language-plaintext highlighter-rouge">NULL</code>, le estamos diciendo al kernel que asigne la memoria, regularmente  la asigna a direcciones cercanas pero mayores a <code class="language-plaintext highlighter-rouge">/proc/sys/vm/mmap_min_addr</code></p>
+  </li>
+  <li>
+    <p><strong>size_t length</strong>: Es la longitud en bytes de la memoria que se va a asignar</p>
+  </li>
+  <li><strong>int prot</strong>: Se refiera a con que protecciones vamos a asignar la memoria, hay varias
+    <ul>
+      <li>PROT_EXEC: La memoria es ejecutable</li>
+      <li>PROT_READ: La memoria tiene permisos de lectura</li>
+      <li>PROT_WRIT: La memoria tiene permisos de escritura</li>
+    </ul>
+  </li>
+  <li>
+    <p><strong>int flags</strong>: Determina si las actualizaciones de la memoria, son visibles para otras asignaciones de memoria dentro de la misma region de la memoria, existe muchas flags, asi que puedes leer cada una de ellas <a href="https://man7.org/linux/man-pages/man2/mmap.2.html">aqui</a>.</p>
+  </li>
+  <li>
+    <p><strong>int fd</strong>: Es el descriptor de archivos el cual sera asginado</p>
+  </li>
+  <li><strong>off_t offset</strong>: Es el desplazamiento desde donde se va a asignar la memoria</li>
+</ul>
+
+<p>Una vez sabiendo eso ya podemos comenzar a tirar codigo</p>
+
+<h2 id="desarrollo-del-programa">Desarrollo del programa</h2>
+
+<p>Primero debemos de empezar a declarar nuestra shellcode como una cadena de caracteres de esta manera:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/mman.h&gt;
+</span>
+<span class="k">const</span> <span class="kt">char</span> <span class="n">shellcode</span><span class="p">[]</span> <span class="o">=</span> <span class="s">"</span><span class="se">\x48\x31\xf6\x56\x48\xbf\x2f\x62\x69\x6e\x2f\x2f\x73\x68\x57\x54\x5f\xb0\x3b\x99\x0f\x05</span><span class="s">"</span><span class="p">;</span>
+</code></pre></div></div>
+<p>La shellcode ejecutara un /bin/sh</p>
+
+<p>Dentro de una funcion, empezare a declarar todo el codigo de la inyeccion, primero debemos sacar el tamaño en bytes de la shellcode, ya que es uno de los argumentos que recibe <strong>mmap</strong></p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">ejecutar_shellcode</span><span class="p">(){</span>
+    <span class="kt">size_t</span> <span class="n">tam_shellcode</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>Observa que se le esta agregando un <code class="language-plaintext highlighter-rouge">- 1</code>, esto es para quitarle el byte nulo.</p>
+
+<p>Despues haremos el llamado a <code class="language-plaintext highlighter-rouge">mmap</code>:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">ejecutar_shellcode</span><span class="p">(){</span>
+    <span class="kt">size_t</span> <span class="n">tam_shellcode</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+
+    <span class="kt">void</span><span class="o">*</span> <span class="n">shellcode_mem</span> <span class="o">=</span> <span class="n">mmap</span><span class="p">(</span>
+        <span class="nb">NULL</span><span class="p">,</span>
+        <span class="n">tam_shellcode</span><span class="p">,</span>
+        <span class="n">PROT_READ</span> <span class="o">|</span> <span class="n">PROT_WRITE</span> <span class="o">|</span> <span class="n">PROT_EXEC</span><span class="p">,</span> <span class="n">MAP_PRIVATE</span> <span class="o">|</span> <span class="n">MAP_ANONYMOUS</span><span class="p">,</span>
+        <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="mi">0</span>
+    <span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>La direccion donde se va a asignar la memoria es <code class="language-plaintext highlighter-rouge">NULL</code> para que el kernel la elija, el tamaño de la memoria a asignar es el tamaño de la shellcode, en las flag le decimos que la memoria se asigne con permisos de lectura, escritura, y ejecucion, con el <code class="language-plaintext highlighter-rouge">-1</code> le estamos diciendo al descriptor de archivos que no se requiere un archivo ya existente y que solo asigne memoria, y te podras dar cuenta de algo, estamos usando la flag <code class="language-plaintext highlighter-rouge">MAP_ANONYMOUS + MAP_PRIVATE</code>, con esas flags le estamos indicando que la asignacion sera simplemente un bloque de memoria en ceros (por eso mismo el offset es 0), la cual estara lista de usar, ademas de ser privada, es decir, estara excluida de otras asignaciones de memoria dentro de la misma region de memoria</p>
+
+<p>Aqui dibuje un diagrama de la asgnacion de memoria con mmap tomando en cuenta el ejemplo</p>
+
+<p><img src="/assets/img/mmap_injection/mmap.jpeg" alt="" /></p>
+
+<p>Lo que se ve a la izquierda es la memoria virtual de un proceso (sin entrar tanto en detalle), te podras dar cuenta que la memoria de la shellcode se asigno dentro de una seccion que se llama <code class="language-plaintext highlighter-rouge">Memory Mapping</code>, en esta seccion se asigna memoria para las librerias compartidas y dinamicas, ademas de las asignaciones de <code class="language-plaintext highlighter-rouge">mmap</code>, pero ojo, para que una asignacion de <code class="language-plaintext highlighter-rouge">mmap</code> recida en esta seccion, debe de ir con la flag <code class="language-plaintext highlighter-rouge">MAP_ANONYMOUS</code>.</p>
+
+<p>Resumidamente el diagrama seria algo asi:</p>
+
+<ul>
+  <li>Usamos <code class="language-plaintext highlighter-rouge">sizeof()</code> para obtener el tamaño de la shellcode y lo guardamos en <code class="language-plaintext highlighter-rouge">tam_shellcode</code></li>
+  <li>Asignamos memoria con <code class="language-plaintext highlighter-rouge">mmap</code> donde el tamaño es lo que tiene <code class="language-plaintext highlighter-rouge">tam_shellcode</code> (22 bytes)</li>
+  <li>Usamos <code class="language-plaintext highlighter-rouge">MAP_ANONYMOUS</code> para indicarle que la asignacion se haga dentro de la seccion <code class="language-plaintext highlighter-rouge">Memory Mapping</code>,</li>
+</ul>
+
+<p>una vez que asignamos memoria para la shellcode, debemos de copiar la shellcode en esa memoria, eso lo hacemos con <code class="language-plaintext highlighter-rouge">memcpy</code>, memcpy se usa para copiar cierta cantidad de bytes desde un origen a un destino.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">memcpy</span><span class="p">(</span><span class="n">shellcode_mem</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="n">tam_shellcode</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>En nuestro ejemplo le estamos diciendo que copie 22 bytes (tam_shellcode) del origen (shellcode), hacia la memoria que asignamos (shellcode_mem), y con esta operacion, nuestra shellcode ya estara escrita en la memoria que asigamos con mmap.</p>
+
+<p>Ahora debemos de invocar a la shellcode, para eso realizamos esto:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="p">(</span><span class="o">*</span><span class="n">shellcode_ptr</span><span class="p">)()</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">*</span><span class="p">)())</span><span class="n">shellcode_mem</span><span class="p">;</span>
+<span class="n">shellcode_ptr</span><span class="p">();</span>
+</code></pre></div></div>
+
+<p>Primero definimos <code class="language-plaintext highlighter-rouge">shellcode_ptr</code> como un puntero a una funcion, con el fin de asignar a <code class="language-plaintext highlighter-rouge">shellcode_ptr</code> la direccion de memora que contiene <code class="language-plaintext highlighter-rouge">shellcode_mem</code> ya que cabe recordar que <code class="language-plaintext highlighter-rouge">shellcode_mem</code> contiene la direccion de memoria desde donde se asigno la shellcode, que es un tipo void *</p>
+
+<p>Despues con <code class="language-plaintext highlighter-rouge">void (*)()</code> le estamos diciendo que defina un puntero a una funcion que no recibe argumentos ni tampoco retorne nada, esto con el fin de que <code class="language-plaintext highlighter-rouge">shellcode_mem</code> sea interpretado como un puntero hacia esa funcion, entonces a travez de <code class="language-plaintext highlighter-rouge">shellcode_ptr</code> podemos mandar a llamar a <code class="language-plaintext highlighter-rouge">shellcode_mem</code>.</p>
+
+<p>Asi que cuando se haga un llamado a <code class="language-plaintext highlighter-rouge">shellcode_ptr();</code>, ejecutara lo que esta almacenado en <code class="language-plaintext highlighter-rouge">shellcode_mem</code>, lo cual es la shellcode:D</p>
+
+<p>Despues solo queda a mandar a llamar a la funcion <code class="language-plaintext highlighter-rouge">ejecutar_shellcode()</code> desde el main:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">ejecutar_shellcode</span><span class="p">();</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Y el codigo completo queda asi:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+#include &lt;string.h&gt;
+#include &lt;sys/mman.h&gt;
+</span>
+<span class="k">const</span> <span class="kt">char</span> <span class="n">shellcode</span><span class="p">[]</span> <span class="o">=</span> <span class="s">"</span><span class="se">\x48\x31\xf6\x56\x48\xbf\x2f\x62\x69\x6e\x2f\x2f\x73\x68\x57\x54\x5f\xb0\x3b\x99\x0f\x05</span><span class="s">"</span><span class="p">;</span> <span class="c1">//bin/sh</span>
+
+<span class="kt">void</span> <span class="nf">ejecutar_shellcode</span><span class="p">(){</span>
+    <span class="kt">size_t</span> <span class="n">tam_shellcode</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">;</span>
+
+    <span class="kt">void</span><span class="o">*</span> <span class="n">shellcode_mem</span> <span class="o">=</span> <span class="n">mmap</span><span class="p">(</span>
+        <span class="nb">NULL</span><span class="p">,</span>
+        <span class="n">tam_shellcode</span><span class="p">,</span>
+        <span class="n">PROT_READ</span> <span class="o">|</span> <span class="n">PROT_WRITE</span> <span class="o">|</span> <span class="n">PROT_EXEC</span><span class="p">,</span> <span class="n">MAP_PRIVATE</span> <span class="o">|</span> <span class="n">MAP_ANONYMOUS</span><span class="p">,</span>
+        <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="mi">0</span>
+    <span class="p">);</span>
+
+    <span class="n">memcpy</span><span class="p">(</span><span class="n">shellcode_mem</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="n">tam_shellcode</span><span class="p">);</span>
+
+    <span class="n">printf</span><span class="p">(</span><span class="s">"Tamaño de la shellcode: %zu bytes</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">tam_shellcode</span><span class="p">);</span>
+    <span class="n">printf</span><span class="p">(</span><span class="s">"Shellcode asignada desde la direccion: %p</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">shellcode_mem</span><span class="p">);</span>
+
+        <span class="kt">void</span> <span class="p">(</span><span class="o">*</span><span class="n">shellcode_ptr</span><span class="p">)()</span> <span class="o">=</span> <span class="p">(</span><span class="kt">void</span> <span class="p">(</span><span class="o">*</span><span class="p">)())</span><span class="n">shellcode_mem</span><span class="p">;</span>
+
+        <span class="n">shellcode_ptr</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">ejecutar_shellcode</span><span class="p">();</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Solo queda compilar y ejectuar</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>gcc -o inyeccion_mmap inyeccion_mmap.c
+./inyeccion_mmap
+</code></pre></div></div>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

