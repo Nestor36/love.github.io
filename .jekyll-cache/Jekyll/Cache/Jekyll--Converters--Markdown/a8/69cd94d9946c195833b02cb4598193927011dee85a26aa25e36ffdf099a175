@@ -1,4 +1,4 @@
-I"�<p>Tenemos un sitio web el cual nos permite realizar varias operaciones con claves PGP, donde descubriremos que el campo UID es vulnerable a <strong>SSTI</strong> con el que conseguiremos RCE, despues haremos movimiento lateral de atlas –&gt; silentobserver via <strong>firejail scape</strong>, despues otro movimiento laterial de silentobserver –&gt; atlas, modificando una libreria de Rust para ejecutar comandos y mandarnos una rev shell, y para la escalada de privilegios explotaremos una vulnerabilidad de firejail donde necesitaremos dos conexiones como Atlas para explotarla.</p>
+I"�<p>Tenemos un sitio web el cual nos permite realizar varias operaciones con claves PGP, donde descubriremos que el campo UID es vulnerable a <strong>SSTI</strong> con el que conseguiremos RCE, despues haremos movimiento lateral de atlas –&gt; silentobserver via <strong>firejail scape</strong>, despues otro movimiento laterial de silentobserver –&gt; atlas, modificando una libreria de Rust para ejecutar comandos y mandarnos una rev shell, y para la escalada de privilegios explotaremos una vulnerabilidad de firejail donde necesitaremos dos conexiones como Atlas para explotarla.</p>
 
 <h2 class="lead" id="enumeracion">Enumeracion</h2>
 
@@ -136,7 +136,7 @@
 
 <h2 id="ssti-server-side-template-injection">SSTI (Server Side Template Injection)</h2>
 
-<p>SSTI significa <strong>inyeccion de plantillas del lado del servidor</strong>, y es una vulnerabilidad que permite a los atacantes inyectar plantillas maliciosas en un motor de plantillas, la cual sera renderizada por el servidor, esto con el fin de ejecutar comandos del lado del servidor, de ahi su nombre <strong>Server Side</strong>, si quieres saber mas sobre SSTI, te recomiendo ver un post que le dedique –&gt; <a href="https://ic4rta.github.io/2023/05/29/UPDP-ssti/">SSTI</a></p>
+<p>SSTI significa <strong>inyeccion de plantillas del lado del servidor</strong>, y es una vulnerabilidad que permite a los atacantes inyectar plantillas maliciosas en un motor de plantillas, la cual sera renderizada por el servidor, esto con el fin de ejecutar comandos del lado del servidor, de ahi su nombre <strong>Server Side</strong>, si quieres saber mas sobre SSTI, te recomiendo ver un post que le dedique –&gt; <a href="https://nestor36.github.io/2023/05/29/UPDP-ssti/">SSTI</a></p>
 
 <p>Una vez sabiendo que es SSTI, lo que podriar estar pasando es que la funcion que se encarga de verificar la firma y el  motor de plantillas, estan procesando la informacion que le pasamos por el UID e inyecta esa informacion en la plantilla, despues la renderiza y la muestra en el sitio web.</p>
 

@@ -144,7 +144,7 @@ Tenemos cosas, observa que el UID que pusimos cuando se genero le key, se muestr
 
 ## SSTI (Server Side Template Injection)
 
-SSTI significa **inyeccion de plantillas del lado del servidor**, y es una vulnerabilidad que permite a los atacantes inyectar plantillas maliciosas en un motor de plantillas, la cual sera renderizada por el servidor, esto con el fin de ejecutar comandos del lado del servidor, de ahi su nombre **Server Side**, si quieres saber mas sobre SSTI, te recomiendo ver un post que le dedique --> [SSTI](https://ic4rta.github.io/2023/05/29/UPDP-ssti/)
+SSTI significa **inyeccion de plantillas del lado del servidor**, y es una vulnerabilidad que permite a los atacantes inyectar plantillas maliciosas en un motor de plantillas, la cual sera renderizada por el servidor, esto con el fin de ejecutar comandos del lado del servidor, de ahi su nombre **Server Side**, si quieres saber mas sobre SSTI, te recomiendo ver un post que le dedique --> [SSTI](https://nestor36.github.io/2023/05/29/UPDP-ssti/)
 
 Una vez sabiendo que es SSTI, lo que podriar estar pasando es que la funcion que se encarga de verificar la firma y el  motor de plantillas, estan procesando la informacion que le pasamos por el UID e inyecta esa informacion en la plantilla, despues la renderiza y la muestra en el sitio web.
 

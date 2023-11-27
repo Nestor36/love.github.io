@@ -1,4 +1,4 @@
-I"ú"<p class="lead">Te explicare como funciona el ataque Session Fixation con el que podremos robar/secuestrar la sesion de otra persona</p>
+I"ï¿½"<p class="lead">Te explicare como funciona el ataque Session Fixation con el que podremos robar/secuestrar la sesion de otra persona</p>
 
 <h2 id="sesiones">Sesiones</h2>
 
@@ -50,7 +50,7 @@
     <p>Encabezado de peticion</p>
 
     <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  GET /recurso HTTP/1.1
-  Host: ic4rta.github.io
+  Host: nestor36.github.io
   Cookie: <span class="nv">SESSIONID</span><span class="o">=</span>identificador_de_sesion
 </code></pre></div>    </div>
     <p>Observa que cuando se hace una peticion, en el header <code class="language-plaintext highlighter-rouge">Cookie</code> se le debe de indicar el session ID con su identificador</p>

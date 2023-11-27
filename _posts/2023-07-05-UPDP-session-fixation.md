@@ -50,7 +50,7 @@ La autenticacion basada en sesiones es un metodo para crear una sesion para cada
 
     ```bash
     GET /recurso HTTP/1.1
-    Host: ic4rta.github.io
+    Host: nestor36.github.io
     Cookie: SESSIONID=identificador_de_sesion
     ```
     Observa que cuando se hace una peticion, en el header ```Cookie``` se le debe de indicar el session ID con su identificador

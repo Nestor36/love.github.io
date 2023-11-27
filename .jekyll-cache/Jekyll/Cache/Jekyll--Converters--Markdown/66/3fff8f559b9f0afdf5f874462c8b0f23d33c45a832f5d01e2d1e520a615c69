@@ -1,4 +1,4 @@
-I"ð–<p class="lead">En esta seccion <strong>Un Poco De Web Pentesting</strong> mi intencion es explicar sin tanto tramite como explotar varias vulnerabilidades web tomando como ejemplo CTFs y laboratorios que me encuentro, ten en cuenta que este solo es un recurso mas de los que hay internet.</p>
+I"ï¿½<p class="lead">En esta seccion <strong>Un Poco De Web Pentesting</strong> mi intencion es explicar sin tanto tramite como explotar varias vulnerabilidades web tomando como ejemplo CTFs y laboratorios que me encuentro, ten en cuenta que este solo es un recurso mas de los que hay internet.</p>
 
 <p>En esta seccion <strong>Un Poco De Web Pentesting</strong> mi intencion es explicar sin tanto tramite como explotar varias vulnerabilidades web tomando como ejemplo CTFs y laboratorios que me encuentro, ten en cuenta que este solo es un recurso mas de los que hay internet.</p>
 
@@ -463,7 +463,7 @@ MariaDB [information_schema]&gt;
 <span class="mi">1</span> <span class="k">row</span> <span class="k">in</span> <span class="k">set</span> <span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">001</span> <span class="n">sec</span><span class="p">)</span>
 </code></pre></div></div>
 
-<p>Si quieres ver algunas de estas tecnicas para evadir filtros pero aplicados a una CTF, puedes leer este otro post mio: <a href="https://ic4rta.github.io/posts/picoCTF-web-gauntlet/">picale aqui</a></p>
+<p>Si quieres ver algunas de estas tecnicas para evadir filtros pero aplicados a una CTF, puedes leer este otro post mio: <a href="https://nestor36.github.io/posts/picoCTF-web-gauntlet/">picale aqui</a></p>
 
 <p>Y como extra, si quieres la explicacion de los labs de PortSwigger puedes ver el writeup de mi compa <a href="https://dantedansh.github.io/SQL-Injection-SQLi-PortSwigger/#">dansh</a></p>
 
