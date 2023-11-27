@@ -70,7 +70,7 @@ $(document).ready(function() {
     searchInput: document.getElementById("js-search-input"),
     resultsContainer: document.getElementById("js-results-container"),
     json: "/search.json",
-    searchResultTemplate: '<div class="search-results__item"><a class="search-results__link" href="{url}"><div class="result-title">{title}</div> <span class="search-results-date"> <time datetime="{date}">{date}</time></span></a><span class="article-tags">{% for tag in post.tags %} <a href="{{site.baseurl}}/tag/{{tag}}" class="article__tag">{{tag}}</a> {% endfor %}</span>{% endif %}</div>',
+    searchResultTemplate: '<div class="search-results__item"><a class="search-results__link" href="{url}"><div class="result-title">{title}</div> <span class="search-results-date"> <time datetime="{date}">{date}</time></span></a></div><hr>',
     noResultsText: '<li class="no-results"><h3>No results found</h3></li>'
    });
 
