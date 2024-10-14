@@ -65,7 +65,7 @@ plugins:
   - jekyll-tagging
   - jekyll-paginate
   - jekyll-sitemap
-  - jekyll/tagging
+#  - jekyll-tagging
 
 
 paginate: 10
