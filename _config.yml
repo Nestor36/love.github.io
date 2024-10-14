@@ -1,6 +1,6 @@
 #-------------------------------
 # General Site Settings
-title: nestor36
+title: GuxFiz
 logo: # You can add own logo. For example '/images/logo.png'.
 description: Average nerd who loves cybersecurity
 baseurl: "" # The subpath of your site, e.g. /blog
@@ -10,15 +10,15 @@ url: "https://nestor36.github.io" # The base hostname & protocol for your site, 
 #-------------------------------
 # Author Settings
 author:
-  name: nestor36
+  name: GuxFiz
   avatar: 'https://secure.gravatar.com/avatar/713f0634508cc8fd29f98ff6d84d86af?s=150'
 
 
 #-------------------------------
 # Hero Settings
 hero:
-  title: nestor36
-  description: Average nerd who loves cybersecurity
+  title: GuxFiz
+  description: I am a nerd who learns extremely quickly and likes to program ♥
   image: 'assets/img/wallhaven-yxkxod.png'
 
 
