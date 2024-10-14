@@ -62,10 +62,11 @@ social:
 markdown: kramdown
 permalink: pretty
 plugins:
+  - jekyll-tagging
   - jekyll-paginate
   - jekyll-sitemap
-  - jekyll-tagging
-#  - jekyll-tagging
+  - jekyll/tagging
+
 
 paginate: 10
 paginate_path: "/page/:num"
