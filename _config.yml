@@ -13,7 +13,12 @@ author:
   name: GuxFiz
   avatar: 'https://secure.gravatar.com/avatar/713f0634508cc8fd29f98ff6d84d86af?s=150'
 
-
+#-------------------------------
+# Tag Settings
+collections:
+  tags:
+    output: true
+    
 #-------------------------------
 # Hero Settings
 hero:
