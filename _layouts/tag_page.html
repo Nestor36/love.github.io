@@ -5,12 +5,8 @@ layout: default
   <div class="row">
     <div class="col col-8 col-d-10 col-m-12 push-m-0 push-d-1 push-2">
       <div class="archive-box">
-        {% if site.tags[page.tag] %}
-          <span class="archive-meta">{{ site.tags[page.tag].size }} {% if site.tags[page.tag].size < 2 %}post {% else %}posts{% endif %} tagged</span>
-          <h1 class="archive-title">{{ page.tag }}</h1>
-        {% else %}
-          <span class="archive-meta">No posts tagged with "{{ page.tag }}"</span>
-        {% endif %}
+        <span class="archive-meta">{{ site.tags[page.tag].size }} {% if site.tags[page.tag].size < 2 %}post {% else %}posts{% endif %} tagged</span>
+        <h1 class="archive-title">{{ page.tag }}</h1>
       </div>
     </div>
   </div>
@@ -21,14 +17,15 @@ layout: default
     <div class="col col-12 col-d-10 col-m-12 push-m-0 push-d-1">
       <div class="container__inner">
         <div class="row grid">
-          {% assign tagged_posts = site.posts | where: "tags", page.tag %}
-          {% if tagged_posts.size > 0 %}
-            {% for post in tagged_posts %}
-              {% include article-content.html %}
-            {% endfor %}
-          {% else %}
-            <p>No posts found for this tag.</p>
-          {% endif %}
+          {% for tag in site.tags %}
+            {% if tag[0] == page.tag %}
+              {% assign posts = tag[1] %}
+            {% endif %}
+          {% endfor %}
+          
+          {% for post in posts %}
+            {% include article-content.html %}
+          {% endfor %}
         </div>
       </div>
     </div>
