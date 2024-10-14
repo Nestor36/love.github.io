@@ -6,7 +6,7 @@
     </div>
     <div class="tag__cloud">
       {% for tag in site.tags %}
-        <a href="{{ site.baseurl }}/tag/{{ tag[0] }}" class="tag">{{ tag[0] }} ({{ tag[1].size }})</a>
+        <a href="{{ site.baseurl }}/tag/{{ tag }}">{{ tag }}</a>
       {% endfor %}
     </div>
   </div>
