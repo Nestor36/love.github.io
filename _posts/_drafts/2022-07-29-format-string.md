@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Ataque format string
-author: c4rta
+author: GuxFiz
 date: 2022-07-29
 #categories: [Explotacion binaria]
 tags: [Explotacion Binaria, format string]

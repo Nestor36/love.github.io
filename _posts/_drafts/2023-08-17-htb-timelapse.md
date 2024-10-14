@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Timelapse - LAPS dump y cracking PFX 
-author: c4rta
+author: GuxFiz
 date: 2023-08-17
 tags: [HTB, LAPS]
 image: /assets/img/timelapse/waifu.jpg
@@ -81,7 +81,7 @@ Para hacer las cosas mas faciles podemos editar el **/etc/hosts** para indicarle
 Para seguir enumerando podemos usar **crackmapexec**, **smbmap**, **smbclient** o **impacket-smbclient**, en mi caso usare de nuevo **crackmapexec** para enumerar recursos compartidos por SMB:
 
 ```ruby
-crackmapexec smb timelapse.htb -u 'c4rta' -p '' --shares
+crackmapexec smb timelapse.htb -u 'GuxFiz' -p '' --shares
 ```
 
 Esto nos arroja:

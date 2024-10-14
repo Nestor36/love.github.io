@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Sandworm - SSTI via PGP keys y Firejail scape
-author: c4rta
+author: GuxFiz
 date: 2023-09-10
 tags: [HTB, SSTI, firejail]
 image: /assets/img/sandworm/waifu.jpg
@@ -115,13 +115,13 @@ Debido a que el sitio web reliza operaciones con claves PGP, podemos generar las
 Como nomas es algo rapido, usare **–quick-gen-key** que solo ocupa el UID (user id)
 
 ```ruby
-gpg --quick-gen-key c4rta
+gpg --quick-gen-key GuxFiz
 ```
 
 Ahora exportaremos la clave a un archivo:
 
 ```ruby
-gpg --armor --export c4rta | sponge pubkey.asc
+gpg --armor --export GuxFiz | sponge pubkey.asc
 ```
 
 Y despues firmamos un texto que puede ser cual sea:
@@ -140,7 +140,7 @@ Y tendremos una salida como esta
 
 ![](/assets/img/sandworm/4.png)
 
-Tenemos cosas, observa que el UID que pusimos cuando se genero le key, se muestra en el resultado, en mi caso el UID que puse fue **c4rta** y se ve reflejado
+Tenemos cosas, observa que el UID que pusimos cuando se genero le key, se muestra en el resultado, en mi caso el UID que puse fue **GuxFiz** y se ve reflejado
 
 ## SSTI (Server Side Template Injection)
 
@@ -151,7 +151,7 @@ Una vez sabiendo que es SSTI, lo que podriar estar pasando es que la funcion que
 Como sabemos que el UID es posiblemente el atributo vulnerable, editaremos la clave y su UID
 
 ```ruby
-gpg --edit-key c4rta
+gpg --edit-key GuxFiz
 ```
 
 Usamos **adduid** para modificar el UID
@@ -168,7 +168,7 @@ Despues de esto nos van aparecer dos UID, como se ve en la imagen, el numero ent
 
 ![](/assets/img/sandworm/6.png)
 
-Ahora selecionaremos el UID viejo, en mi caso **c4rta**
+Ahora selecionaremos el UID viejo, en mi caso **GuxFiz**
 
 ```ruby
 uid 1
@@ -187,7 +187,7 @@ Ahora solo nos debe de quedar un UID que es el que tiene el payload
 Para terminar le damos **save** para guardar cambios, volvemos a generar la clave, firmamos un texto y probamos en el sitio web
 
 ```ruby
-gpg --armor --export "{{7*7}} <c4rta@email.com>" | sponge pubkey.asc
+gpg --armor --export "{{7*7}} <GuxFiz@email.com>" | sponge pubkey.asc
 ```
 
 ```ruby

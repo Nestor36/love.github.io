@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Inyeccion de shellcodes via EnumDesktopsW()
-author: c4rta
+author: GuxFiz
 date: 2023-07-07
 tags: [MalDev]
 image: /assets/img/enumDesktopW/waifu.jpg

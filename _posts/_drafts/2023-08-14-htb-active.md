@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Active - GPP decrypt y Kerberoasting
-author: c4rta
+author: GuxFiz
 date: 2023-08-14
 tags: [HTB, GPP, Kerberoasting]
 image: /assets/img/active/waifu.jpg

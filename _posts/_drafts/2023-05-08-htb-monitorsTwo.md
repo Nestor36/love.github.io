@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox MonitorsTwo - Unauthenticated RCE & Docker Weak Permissions
-author: c4rta
+author: GuxFiz
 date: 2023-05-08
 ##categories: [Maquinas, HackTheBox]
 tags: [HTB, Command Injection, Docker]

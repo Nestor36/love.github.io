@@ -1,7 +1,7 @@
 ---
 layout: post
 title: IOF - Integer Overflow/Underflow
-author: c4rta
+author: GuxFiz
 date: 2022-08-01
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, Integer Overflow]

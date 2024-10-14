@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBoo Entity - Type Confusion via Union
-author: c4rta
+author: GuxFiz
 date: 2023-04-15
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, Type Confusion] 

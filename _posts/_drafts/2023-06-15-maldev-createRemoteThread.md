@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Inyeccion de shellcode via CreateRemoteThread + IsDebuggerPresent
-author: c4rta
+author: GuxFiz
 date: 2023-06-15
 tags: [MalDev]
 image: /assets/img/remote_thread_injection/waifu.jpg

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: protostar heap2 - UAF (Use-After-Free)
-author: c4rta
+author: GuxFiz
 date: 2023-01-21
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, Heap, UAF]
@@ -133,7 +133,7 @@ Esto lo hare poniendo en breakpoint en ```0x08048a01``` que es donde se hace lo 
 
 Primeramente podemos ver como en ```EAX``` se almacena nuestro input:
 
-```*EAX  0x804c818 ◂— 'c4rta\n'```
+```*EAX  0x804c818 ◂— 'GuxFiz\n'```
 
 Y si mostramos el contenido del registro ```EAX``` podemos ver algo como esto:
 

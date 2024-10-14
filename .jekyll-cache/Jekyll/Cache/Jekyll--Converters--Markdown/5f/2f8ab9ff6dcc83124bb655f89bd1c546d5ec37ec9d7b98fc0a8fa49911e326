@@ -1,4 +1,4 @@
-I"Â1<p>Tenemos un sitio web a travez del puerto 5000 con NodeJS y ExpressJS con un panel de login el cual es vulnerable a NoSQLi con el que podemos hacer Authentication Bypass, despues descubriremos un apartado para subir archivos XML el cual es vulnetable a XXE con el cual podemos leer archivos internos de la maquina, sin embargo, ocasionando un error se va a filtrar el directorio de la aplicacion, asi que usando XXE vamos leer el archivo server.js en donde descubriremos una Insecure Deserialization en node-serialize, asi que haremos un Deserialization Attack usando IIFE para conseguir RCE, para la escalada encontraremos un puerto que corresponde a MongoDB y encontraremos las credenciales de admin donde a nivel de sudoers podemos ejecutar lo que sea</p>
+I"ï¿½1<p>Tenemos un sitio web a travez del puerto 5000 con NodeJS y ExpressJS con un panel de login el cual es vulnerable a NoSQLi con el que podemos hacer Authentication Bypass, despues descubriremos un apartado para subir archivos XML el cual es vulnetable a XXE con el cual podemos leer archivos internos de la maquina, sin embargo, ocasionando un error se va a filtrar el directorio de la aplicacion, asi que usando XXE vamos leer el archivo server.js en donde descubriremos una Insecure Deserialization en node-serialize, asi que haremos un Deserialization Attack usando IIFE para conseguir RCE, para la escalada encontraremos un puerto que corresponde a MongoDB y encontraremos las credenciales de admin donde a nivel de sudoers podemos ejecutar lo que sea</p>
 
 <h2 class="lead" id="enumeracion">Enumeracion</h2>
 
@@ -66,7 +66,7 @@
 
 <p><img src="/assets/img/nodeBlog/2.png" alt="" /></p>
 
-<p>Si probamos con credenciales random como lo puenden ser <strong>c4rta</strong> y <strong>nose</strong> nos dice que el usuario es invalido</p>
+<p>Si probamos con credenciales random como lo puenden ser <strong>GuxFiz</strong> y <strong>nose</strong> nos dice que el usuario es invalido</p>
 
 <p><img src="/assets/img/nodeBlog/3.png" alt="" /></p>
 
@@ -93,7 +93,7 @@ Content-Type: application/x</span><span class="o">-</span><span class="n">www</s
 <span class="no">Referer</span><span class="p">:</span> <span class="n">http</span><span class="ss">:/</span><span class="o">/</span><span class="mf">10.10</span><span class="o">.</span><span class="mf">11.139</span><span class="p">:</span><span class="mi">5000</span><span class="o">/</span><span class="n">login</span>
 <span class="no">Upgrade</span><span class="o">-</span><span class="no">Insecure</span><span class="o">-</span><span class="no">Requests</span><span class="p">:</span> <span class="mi">1</span>
 
-<span class="n">user</span><span class="o">=</span><span class="n">c4rta</span><span class="o">&amp;</span><span class="n">password</span><span class="o">=</span><span class="n">nose</span>
+<span class="n">user</span><span class="o">=</span><span class="n">GuxFiz</span><span class="o">&amp;</span><span class="n">password</span><span class="o">=</span><span class="n">nose</span>
 </code></pre></div></div>
 <p>No hay mucho de destacar, podemos ver en el <strong>Content-Type</strong> que el contenido que estamos enviando es un formulario en URL encode, es una peticion POST, y demas, sin embargo, como estamos contra un login, siempre es bueno probar si existe una SQLi o NoSQLi para hacer <strong>Authentication Bypass</strong>, les puedo adelantar que mediante SQLi no se va a poder, y viendo por las tecnologias que hemos encontrado hasta ahora, es muy probable que use <strong>MEAN stack</strong>, asi que probaremos con NoSQLi</p>
 

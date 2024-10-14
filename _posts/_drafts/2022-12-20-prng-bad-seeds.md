@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Explotanto un PRNG bad seed
-author: c4rta
+author: GuxFiz
 date: 2022-12-20
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, bad seed]

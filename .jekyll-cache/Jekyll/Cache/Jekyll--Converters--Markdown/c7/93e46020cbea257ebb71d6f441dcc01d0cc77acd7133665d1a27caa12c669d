@@ -1,4 +1,4 @@
-I"ÃB<p class="lead">Te explicare como funciona la vulnerabilidad SSTI, sus payloads y como explotarla</p>
+I"ï¿½B<p class="lead">Te explicare como funciona la vulnerabilidad SSTI, sus payloads y como explotarla</p>
 
 <h2 id="flask-y-jinja">Flask y Jinja</h2>
 
@@ -35,14 +35,14 @@
 
 <span class="o">@</span><span class="n">app</span><span class="p">.</span><span class="n">route</span><span class="p">(</span><span class="s">'/'</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">index</span><span class="p">():</span>
-    <span class="n">nombre</span> <span class="o">=</span> <span class="s">"c4rta"</span>
+    <span class="n">nombre</span> <span class="o">=</span> <span class="s">"GuxFiz"</span>
 
     <span class="k">return</span> <span class="n">render_template</span><span class="p">(</span><span class="s">'plantilla.html'</span><span class="p">,</span> <span class="n">nombre</span><span class="o">=</span><span class="n">nombre</span><span class="p">)</span>
 
 <span class="k">if</span> <span class="n">__name__</span> <span class="o">==</span> <span class="s">'__main__'</span><span class="p">:</span>
     <span class="n">app</span><span class="p">.</span><span class="n">run</span><span class="p">()</span>
 </code></pre></div></div>
-<p>Lo que esta haciendo es que cuando se visite la ruta <code class="language-plaintext highlighter-rouge">/</code>, va a renderizar la plantilla con el nombre <code class="language-plaintext highlighter-rouge">plantilla.html</code> con los valores proporcionados, en este caso, el nombre, que tiene como valor <code class="language-plaintext highlighter-rouge">c4rta</code>, para este ejemplo se esta usando <code class="language-plaintext highlighter-rouge">render_template</code> el cual renderiza desde un acrhivo, pero tambien puede ser usado <code class="language-plaintext highlighter-rouge">render_template_string</code>, que renderiza desde un string, de esta forma:</p>
+<p>Lo que esta haciendo es que cuando se visite la ruta <code class="language-plaintext highlighter-rouge">/</code>, va a renderizar la plantilla con el nombre <code class="language-plaintext highlighter-rouge">plantilla.html</code> con los valores proporcionados, en este caso, el nombre, que tiene como valor <code class="language-plaintext highlighter-rouge">GuxFiz</code>, para este ejemplo se esta usando <code class="language-plaintext highlighter-rouge">render_template</code> el cual renderiza desde un acrhivo, pero tambien puede ser usado <code class="language-plaintext highlighter-rouge">render_template_string</code>, que renderiza desde un string, de esta forma:</p>
 
 <div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">flask</span> <span class="kn">import</span> <span class="n">Flask</span><span class="p">,</span> <span class="n">render_template_string</span>
 
@@ -50,7 +50,7 @@
 
 <span class="o">@</span><span class="n">app</span><span class="p">.</span><span class="n">route</span><span class="p">(</span><span class="s">'/'</span><span class="p">)</span>
 <span class="k">def</span> <span class="nf">index</span><span class="p">():</span>
-    <span class="n">nombre</span> <span class="o">=</span> <span class="s">"c4rta"</span>
+    <span class="n">nombre</span> <span class="o">=</span> <span class="s">"GuxFiz"</span>
 
     <span class="n">plantilla</span> <span class="o">=</span> <span class="s">"""
     &lt;html&gt;

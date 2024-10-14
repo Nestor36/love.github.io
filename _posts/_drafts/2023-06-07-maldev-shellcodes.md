@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Shellcodes - syscall write() y execve(bin/sh)
-author: c4rta
+author: GuxFiz
 date: 2023-06-07
 ##categories: [Un Poco De Web Pentest, SSTI]
 tags: [MalDev]

@@ -110,7 +110,7 @@
 
 <p><img src="/assets/img/htb-cozyHosting/3.png" alt="" /></p>
 
-<p>Es curioso, por que puedo deducir que se esta intentando conectar por ssh a <strong>c4rta</strong>.</p>
+<p>Es curioso, por que puedo deducir que se esta intentando conectar por ssh a <strong>GuxFiz</strong>.</p>
 
 <p>Interceptare la peticion con burp y lo analizaremos mas a fondo</p>
 
@@ -128,7 +128,7 @@
 
 <p><img src="/assets/img/htb-cozyHosting/7.png" alt="" /></p>
 
-<p>Observa como al final sale: <strong>/bin/bash: line 1: whoami@c4rta: command not found</strong></p>
+<p>Observa como al final sale: <strong>/bin/bash: line 1: whoami@GuxFiz: command not found</strong></p>
 
 <p>Ahora con esto sabemos que interpreta bash, y esto es potencialmente un <strong>Command injection</strong></p>
 

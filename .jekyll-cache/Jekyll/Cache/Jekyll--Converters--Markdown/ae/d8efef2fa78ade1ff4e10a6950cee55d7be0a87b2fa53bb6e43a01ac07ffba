@@ -1,4 +1,4 @@
-I"�O<p class="lead">Este desafio es una introduccion una tecnica llamada Use-After-Free la cual basicamente ocurre cuando se hace referencia a la memoria despues de que haya sido liberada</p>
+I"�O<p class="lead">Este desafio es una introduccion una tecnica llamada Use-After-Free la cual basicamente ocurre cuando se hace referencia a la memoria despues de que haya sido liberada</p>
 
 <h2 id="analizando-el-binario-y-explotacion">Analizando el binario y explotacion</h2>
 
@@ -116,7 +116,7 @@
 
 <p>Primeramente podemos ver como en <code class="language-plaintext highlighter-rouge">EAX</code> se almacena nuestro input:</p>
 
-<p><code class="language-plaintext highlighter-rouge">*EAX  0x804c818 ◂— 'c4rta\n'</code></p>
+<p><code class="language-plaintext highlighter-rouge">*EAX  0x804c818 ◂— 'GuxFiz\n'</code></p>
 
 <p>Y si mostramos el contenido del registro <code class="language-plaintext highlighter-rouge">EAX</code> podemos ver algo como esto:</p>
 

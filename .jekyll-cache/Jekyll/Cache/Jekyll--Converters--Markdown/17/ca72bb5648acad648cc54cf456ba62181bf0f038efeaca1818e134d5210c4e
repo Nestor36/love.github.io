@@ -154,7 +154,7 @@ Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
 
 <p>Como extra, dentro dentro de la carpeta <code class="language-plaintext highlighter-rouge">Documents</code> de <code class="language-plaintext highlighter-rouge">ross</code>, hay un archivo de un gestor de contraseñas que podriamos intentar crackear, pero les digo que no es por ahi</p>
 
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>󰣇  c4rta /mnt/ross  tree      
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>󰣇  GuxFiz /mnt/ross  tree      
 .
 ├── Desktop
 ├── Documents

@@ -109,12 +109,12 @@
 
 <p>Como nomas es algo rapido, usare <strong>–quick-gen-key</strong> que solo ocupa el UID (user id)</p>
 
-<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">quick</span><span class="o">-</span><span class="n">gen</span><span class="o">-</span><span class="n">key</span> <span class="n">c4rta</span>
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">quick</span><span class="o">-</span><span class="n">gen</span><span class="o">-</span><span class="n">key</span> <span class="n">GuxFiz</span>
 </code></pre></div></div>
 
 <p>Ahora exportaremos la clave a un archivo:</p>
 
-<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">armor</span> <span class="o">--</span><span class="n">export</span> <span class="n">c4rta</span> <span class="o">|</span> <span class="n">sponge</span> <span class="n">pubkey</span><span class="p">.</span><span class="nf">asc</span>
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">armor</span> <span class="o">--</span><span class="n">export</span> <span class="n">GuxFiz</span> <span class="o">|</span> <span class="n">sponge</span> <span class="n">pubkey</span><span class="p">.</span><span class="nf">asc</span>
 </code></pre></div></div>
 
 <p>Y despues firmamos un texto que puede ser cual sea:</p>
@@ -132,7 +132,7 @@
 
 <p><img src="/assets/img/sandworm/4.png" alt="" /></p>
 
-<p>Tenemos cosas, observa que el UID que pusimos cuando se genero le key, se muestra en el resultado, en mi caso el UID que puse fue <strong>c4rta</strong> y se ve reflejado</p>
+<p>Tenemos cosas, observa que el UID que pusimos cuando se genero le key, se muestra en el resultado, en mi caso el UID que puse fue <strong>GuxFiz</strong> y se ve reflejado</p>
 
 <h2 id="ssti-server-side-template-injection">SSTI (Server Side Template Injection)</h2>
 
@@ -142,7 +142,7 @@
 
 <p>Como sabemos que el UID es posiblemente el atributo vulnerable, editaremos la clave y su UID</p>
 
-<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">edit</span><span class="o">-</span><span class="n">key</span> <span class="n">c4rta</span>
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">edit</span><span class="o">-</span><span class="n">key</span> <span class="n">GuxFiz</span>
 </code></pre></div></div>
 
 <p>Usamos <strong>adduid</strong> para modificar el UID</p>
@@ -159,7 +159,7 @@
 
 <p><img src="/assets/img/sandworm/6.png" alt="" /></p>
 
-<p>Ahora selecionaremos el UID viejo, en mi caso <strong>c4rta</strong></p>
+<p>Ahora selecionaremos el UID viejo, en mi caso <strong>GuxFiz</strong></p>
 
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">uid</span> <span class="mi">1</span>
 </code></pre></div></div>
@@ -175,7 +175,7 @@
 
 <p>Para terminar le damos <strong>save</strong> para guardar cambios, volvemos a generar la clave, firmamos un texto y probamos en el sitio web</p>
 
-<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">armor</span> <span class="o">--</span><span class="n">export</span> <span class="s2">" &lt;c4rta@email.com&gt;"</span> <span class="o">|</span> <span class="n">sponge</span> <span class="n">pubkey</span><span class="p">.</span><span class="nf">asc</span>
+<div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">gpg</span> <span class="o">--</span><span class="n">armor</span> <span class="o">--</span><span class="n">export</span> <span class="s2">" &lt;GuxFiz@email.com&gt;"</span> <span class="o">|</span> <span class="n">sponge</span> <span class="n">pubkey</span><span class="p">.</span><span class="nf">asc</span>
 </code></pre></div></div>
 
 <div class="language-ruby highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">echo</span> <span class="s1">'nazuna besto waifu'</span> <span class="o">|</span> <span class="n">gpg</span> <span class="o">--</span><span class="n">clear</span><span class="o">-</span><span class="n">sign</span>

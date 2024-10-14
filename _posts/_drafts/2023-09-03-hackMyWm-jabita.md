@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackMyWM Jabita - LFI, awk abuse, Python Library Hijacking
-author: c4rta
+author: GuxFiz
 date: 2023-09-03
 tags: [HackMyWM, LFI, Python Library Hijacking]
 image: /assets/img/jabita/waifu.jpg

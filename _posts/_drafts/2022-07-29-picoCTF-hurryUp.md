@@ -1,7 +1,7 @@
 ---
 layout: post
 title: picoCTF - Hurry up! Wait!
-author: c4rta
+author: GuxFiz
 date: 2022-07-29
 ##categories: [Reversing]
 tags: [Reversing]

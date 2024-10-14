@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Simple XSS reflejado en un sitio web real
-author: c4rta
+author: GuxFiz
 date: 2023-06-28
 ##categories: [Maquinas, HackTheBox]
 image: /assets/img/simple_xss/waifu.jpg
@@ -37,7 +37,7 @@ Fue muy random, originalmente yo solo queria buscar una noticia, entonces use su
 
 ![](/assets/img/simple_xss/1.png)
 
-Vean como cuando se realiza una busqueda, te manda a la ruta ```/buscar/``` la cual tiene un parametro de consulta el cual es la ```q```, como se ve en ```?q=c4rta```, asi que el parametro ```q``` es utilizado para especificar el termino que se quiere buscar, y del lado de la pagina web, el termino que busque se refleja en la pagina web
+Vean como cuando se realiza una busqueda, te manda a la ruta ```/buscar/``` la cual tiene un parametro de consulta el cual es la ```q```, como se ve en ```?q=GuxFiz```, asi que el parametro ```q``` es utilizado para especificar el termino que se quiere buscar, y del lado de la pagina web, el termino que busque se refleja en la pagina web
 
 ![](/assets/img/simple_xss/2.png)
 
@@ -53,7 +53,7 @@ var searchString = document.getElementById('searchtextsimple').value;
 Lo que esta haciendo es crear una variable llamada ```searchString``` la cual va a contener el valor del atributo ```value``` del elemento con el id ```searchtextsimple```, y ese elemento con el id es este:
 
 ```html
-<input id="searchtextsimple" type="text" name="q" class="form-control" placeholder="Buscar" value="c4rta"></input>
+<input id="searchtextsimple" type="text" name="q" class="form-control" placeholder="Buscar" value="GuxFiz"></input>
 ```
 
 Despues en el JS tenemos que nuestro input el cual esta guardado en ```searchString``` se le concatena sin ningun tipo de procesamiento ni sanitizacion a la URL a tra vez del parametro ```q```:

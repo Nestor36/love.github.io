@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Leak stack canary - bypass
-author: c4rta
+author: GuxFiz
 date: 2022-08-03
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, format string, canary bypass]

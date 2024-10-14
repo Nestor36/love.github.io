@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Un Poco de Pentesting - Session Fixation
-author: c4rta
+author: GuxFiz
 date: 2023-07-05
 ##categories: [Maquinas, HackTheBox]
 tags: [Session Fixation]

@@ -1,6 +1,6 @@
 #-------------------------------
 # General Site Settings
-title: c4rta
+title: GuxFiz
 logo: # You can add own logo. For example '/images/logo.png'.
 description: Average nerd who loves cybersecurity
 baseurl: "" # The subpath of your site, e.g. /blog
@@ -10,7 +10,7 @@ url: "https://nestor36.github.io" # The base hostname & protocol for your site, 
 #-------------------------------
 # Author Settings
 author:
-  name: c4rta
+  name: GuxFiz
   avatar: 'https://secure.gravatar.com/avatar/713f0634508cc8fd29f98ff6d84d86af?s=150'
 
 
@@ -37,8 +37,8 @@ contact:
 # Example of adding a new link to the footer - {icon: "ion-logo-github", link: "https://github.com"}
 # Other icons can be found at https://ionicons.com/v4/
 social:
-- {icon: "ion-logo-twitter", link: "https://twitter.com/_c4rta_"}
-- {icon: "ion-logo-github", link: "https://github.com/ic4rta"}
+- {icon: "ion-logo-github", link: "https://github.com/nestor36"}
+#- {icon: "ion-logo-twitter", link: "https://twitter.com/_GuxFiz_"}
 
 
 #-------------------------------

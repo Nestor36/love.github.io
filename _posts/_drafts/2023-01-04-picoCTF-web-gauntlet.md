@@ -1,7 +1,7 @@
 ---
 layout: post
 title: picoCTF web gauntlet - sql injection y evadiendo filtros
-author: c4rta
+author: GuxFiz
 date: 2023-01-04
 ##categories: [Desafios Web]
 tags: [SQL injection]
@@ -73,11 +73,11 @@ Y como input le podemos pasar esto
 
 Otra manera de resolverlo es usando el operador ```UNION``` y la consulta quedaria algo asi:
 
-```SELECT * FROM users WHERE username='c4rta'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;```
+```SELECT * FROM users WHERE username='GuxFiz'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;```
 
 Esto hace dos consultas, la primera es:
 
-```SELECT * FROM users WHERE username='c4rta'```
+```SELECT * FROM users WHERE username='GuxFiz'```
 
 Y la segunda:
 
@@ -86,7 +86,7 @@ Y la segunda:
 ```UNION``` combina los SELECT, ```/**/``` entre todas las palabras representan los espacios en blanco. Y tenemos que incluir la parte LIMIT 1 porque generalmente en una base de datos, el administrador es la primera entrada de la tabla y con esta consulta, simplemente recuperamos la primera línea, que en este caso es el administrador, entonces nuestro input queda:
 
 
-usuario: ```c4rta'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;```
+usuario: ```GuxFiz'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;```
 
 ## Round 5
 

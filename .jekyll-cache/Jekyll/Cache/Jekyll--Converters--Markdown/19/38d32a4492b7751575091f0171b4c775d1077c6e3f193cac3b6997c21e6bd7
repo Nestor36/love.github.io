@@ -1,4 +1,4 @@
-I"�1<p>Te voy a enseñar como encontre una vulnerabilidad XSS reflejado en un sitio web real</p>
+I"�1<p>Te voy a enseñar como encontre una vulnerabilidad XSS reflejado en un sitio web real</p>
 
 <p class="lead"><strong>Este no es ningun writeup, pero te voy a mostrar como encontre de casualidad una vulnerabilidad <code class="language-plaintext highlighter-rouge">XSS reflejado</code> en un sitio web real, cabe recalcar que la vulnerabilidad ya la reporte, y no estoy promoviendo explotar vulnerabilidades en entornos reales, y simplemente te voy a dar la idea de algo que podria hacer alguien con malas intenciones, que este no es el caso, y espero que el tuyo tampoco</strong></p>
 
@@ -32,7 +32,7 @@
 
 <p><img src="/assets/img/simple_xss/1.png" alt="" /></p>
 
-<p>Vean como cuando se realiza una busqueda, te manda a la ruta <code class="language-plaintext highlighter-rouge">/buscar/</code> la cual tiene un parametro de consulta el cual es la <code class="language-plaintext highlighter-rouge">q</code>, como se ve en <code class="language-plaintext highlighter-rouge">?q=c4rta</code>, asi que el parametro <code class="language-plaintext highlighter-rouge">q</code> es utilizado para especificar el termino que se quiere buscar, y del lado de la pagina web, el termino que busque se refleja en la pagina web</p>
+<p>Vean como cuando se realiza una busqueda, te manda a la ruta <code class="language-plaintext highlighter-rouge">/buscar/</code> la cual tiene un parametro de consulta el cual es la <code class="language-plaintext highlighter-rouge">q</code>, como se ve en <code class="language-plaintext highlighter-rouge">?q=GuxFiz</code>, asi que el parametro <code class="language-plaintext highlighter-rouge">q</code> es utilizado para especificar el termino que se quiere buscar, y del lado de la pagina web, el termino que busque se refleja en la pagina web</p>
 
 <p><img src="/assets/img/simple_xss/2.png" alt="" /></p>
 
@@ -46,7 +46,7 @@
 </code></pre></div></div>
 <p>Lo que esta haciendo es crear una variable llamada <code class="language-plaintext highlighter-rouge">searchString</code> la cual va a contener el valor del atributo <code class="language-plaintext highlighter-rouge">value</code> del elemento con el id <code class="language-plaintext highlighter-rouge">searchtextsimple</code>, y ese elemento con el id es este:</p>
 
-<div class="language-html highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nt">&lt;input</span> <span class="na">id=</span><span class="s">"searchtextsimple"</span> <span class="na">type=</span><span class="s">"text"</span> <span class="na">name=</span><span class="s">"q"</span> <span class="na">class=</span><span class="s">"form-control"</span> <span class="na">placeholder=</span><span class="s">"Buscar"</span> <span class="na">value=</span><span class="s">"c4rta"</span><span class="nt">&gt;&lt;/input&gt;</span>
+<div class="language-html highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nt">&lt;input</span> <span class="na">id=</span><span class="s">"searchtextsimple"</span> <span class="na">type=</span><span class="s">"text"</span> <span class="na">name=</span><span class="s">"q"</span> <span class="na">class=</span><span class="s">"form-control"</span> <span class="na">placeholder=</span><span class="s">"Buscar"</span> <span class="na">value=</span><span class="s">"GuxFiz"</span><span class="nt">&gt;&lt;/input&gt;</span>
 </code></pre></div></div>
 
 <p>Despues en el JS tenemos que nuestro input el cual esta guardado en <code class="language-plaintext highlighter-rouge">searchString</code> se le concatena sin ningun tipo de procesamiento ni sanitizacion a la URL a tra vez del parametro <code class="language-plaintext highlighter-rouge">q</code>:</p>

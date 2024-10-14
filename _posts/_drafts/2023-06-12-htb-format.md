@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Format - LFI, Redis y Python format string
-author: c4rta
+author: GuxFiz
 date: 2023-06-12
 ##categories: [Maquinas, HackTheBox]
 tags: [HTB, LFI, Python Format String]
@@ -453,16 +453,16 @@ class License():
 Ahora dentro de redis, usaremos ```HMSET``` para establecer varios valores en una clave:
 
 ```
-HMSET c4rta first-name "{license.__init__.__globals__[secret_encoded]}" last-name hola username c4rta
+HMSET GuxFiz first-name "{license.__init__.__globals__[secret_encoded]}" last-name hola username GuxFiz
 ```
 
-En este caso, estamos estableciendo first-name, last-name y username en la clave "c4rta" dentro de una estructura hash, y el valor que le asignamos a first-name es ```{license.init.globals[secret_encoded]}``` donde estamos llamando a ```secret_encoded``` el cual es una variable en el archivo que analizamos y el cual contiene la licencia, que vendria siendo la contraseña, como se ve aca:
+En este caso, estamos estableciendo first-name, last-name y username en la clave "GuxFiz" dentro de una estructura hash, y el valor que le asignamos a first-name es ```{license.init.globals[secret_encoded]}``` donde estamos llamando a ```secret_encoded``` el cual es una variable en el archivo que analizamos y el cual contiene la licencia, que vendria siendo la contraseña, como se ve aca:
 
 ```py
 secret = [line.strip() for line in open("/root/license/secret")][0]
 secret_encoded = secret.encode()
 ```
-Asi que ahora si llamamos al archivo con la licencia ```c4rta``` nos debe de mostrar la contraseña de root ```sudo /usr/bin/license -p c4rta```
+Asi que ahora si llamamos al archivo con la licencia ```GuxFiz``` nos debe de mostrar la contraseña de root ```sudo /usr/bin/license -p GuxFiz```
 
 ![](/assets/img/htb-format/20.png)
 

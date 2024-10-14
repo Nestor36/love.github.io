@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Inyeccion de shellcodes usando la syscall mmap
-author: c4rta
+author: GuxFiz
 date: 2023-06-10
 tags: [MalDev]
 image: /assets/img/mmap_injection/waifu.jpg

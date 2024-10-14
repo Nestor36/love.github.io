@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Shoppy - NoSQL injection y Docker
-author: c4rta
+author: GuxFiz
 date: 2023-01-16
 ##categories: [Maquinas, HackTheBox]
 tags: [HTB, NoSQLi, Docker, hash cracking]

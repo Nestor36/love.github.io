@@ -123,10 +123,10 @@ message LoginUserRequest {
 
 <ul>
   <li>
-    <p>Registro: <code class="language-plaintext highlighter-rouge">grpcurl -plaintext -d '{"username":"c4rta", "password":"12345"}' 10.129.93.244:50051 SimpleApp.RegisterUser</code></p>
+    <p>Registro: <code class="language-plaintext highlighter-rouge">grpcurl -plaintext -d '{"username":"GuxFiz", "password":"12345"}' 10.129.93.244:50051 SimpleApp.RegisterUser</code></p>
   </li>
   <li>
-    <p>Login: <code class="language-plaintext highlighter-rouge">grpcurl -plaintext -d '{"username":"c4rta", "password":"12345"}' -v 10.129.93.244:50051 SimpleApp.LoginUser</code>
+    <p>Login: <code class="language-plaintext highlighter-rouge">grpcurl -plaintext -d '{"username":"GuxFiz", "password":"12345"}' -v 10.129.93.244:50051 SimpleApp.LoginUser</code>
 Esto arroja esto:</p>
   </li>
 </ul>

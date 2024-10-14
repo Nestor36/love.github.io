@@ -1,4 +1,4 @@
-I"�<p>En este desafio explotaremos un SQLi donde hay que evadir un par de filtros para conseguir la flag</p>
+I"�<p>En este desafio explotaremos un SQLi donde hay que evadir un par de filtros para conseguir la flag</p>
 
 <p class="lead">Para este desafio tenemos que hacer bypass de varios filtros usando sql injection, el SGBD es sqlite y el usuario para todos los casos es <code class="language-plaintext highlighter-rouge">admin</code></p>
 
@@ -59,11 +59,11 @@ contra: –&gt; esto puede ser lo que sea</p>
 
 <p>Otra manera de resolverlo es usando el operador <code class="language-plaintext highlighter-rouge">UNION</code> y la consulta quedaria algo asi:</p>
 
-<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='c4rta'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;</code></p>
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='GuxFiz'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;</code></p>
 
 <p>Esto hace dos consultas, la primera es:</p>
 
-<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='c4rta'</code></p>
+<p><code class="language-plaintext highlighter-rouge">SELECT * FROM users WHERE username='GuxFiz'</code></p>
 
 <p>Y la segunda:</p>
 
@@ -71,7 +71,7 @@ contra: –&gt; esto puede ser lo que sea</p>
 
 <p><code class="language-plaintext highlighter-rouge">UNION</code> combina los SELECT, <code class="language-plaintext highlighter-rouge">/**/</code> entre todas las palabras representan los espacios en blanco. Y tenemos que incluir la parte LIMIT 1 porque generalmente en una base de datos, el administrador es la primera entrada de la tabla y con esta consulta, simplemente recuperamos la primera línea, que en este caso es el administrador, entonces nuestro input queda:</p>
 
-<p>usuario: <code class="language-plaintext highlighter-rouge">c4rta'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;</code></p>
+<p>usuario: <code class="language-plaintext highlighter-rouge">GuxFiz'/**/UNION/**/SELECT/**/*/**/FROM/**/users/**/LIMIT/**/1;</code></p>
 
 <h2 id="round-5">Round 5</h2>
 

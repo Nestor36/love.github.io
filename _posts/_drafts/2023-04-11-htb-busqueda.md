@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Busqueda - Arbitrary Code Execution via eval()
-author: c4rta
+author: GuxFiz
 date: 2023-04-11
 ##categories: [Maquinas, HackTheBox]
 tags: [HTB, eval function, Docker]

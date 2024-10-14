@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Precious - Command injection y YAML deserialization
-author: c4rta
+author: GuxFiz
 date: 2023-01-02
 ##categories: [Maquinas, HackTheBox]
 tags: [HTB, Command injection, YAML deserialization]

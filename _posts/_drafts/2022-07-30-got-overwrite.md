@@ -1,7 +1,7 @@
 ---
 layout: post
 title: GOT overwrite con Format String
-author: c4rta
+author: GuxFiz
 date: 2022-07-30
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, GOT overwrite, format string]

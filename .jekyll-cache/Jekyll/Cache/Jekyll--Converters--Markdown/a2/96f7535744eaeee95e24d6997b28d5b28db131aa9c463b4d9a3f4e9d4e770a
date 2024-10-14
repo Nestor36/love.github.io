@@ -1,4 +1,4 @@
-I"��<p>Tenemos un LFI en el parametro ID, que nos permitira leer archivos de configuracion de un reverse proxy, donde aprovecharemos una configuracion incorrecta de un proxy mediante una expresion, que nos permitira modificar una propiedad mediante la interacción de un socket de redis para convertirnos en “Pro”, posteriormente nos aprovecharemos otra vez de LFI donde usaremos el parametro ID para incluir un archivo PHP, y el parametro TXT para RCE</p>
+I"��<p>Tenemos un LFI en el parametro ID, que nos permitira leer archivos de configuracion de un reverse proxy, donde aprovecharemos una configuracion incorrecta de un proxy mediante una expresion, que nos permitira modificar una propiedad mediante la interacción de un socket de redis para convertirnos en “Pro”, posteriormente nos aprovecharemos otra vez de LFI donde usaremos el parametro ID para incluir un archivo PHP, y el parametro TXT para RCE</p>
 
 <p>Para la flag de user nos volveremos a conectar por el socket a redis, para filtrar la contraseña de SSH, y para la escalada explotaremos una vulnerabilidad format string en python</p>
 
@@ -434,15 +434,15 @@
 
 <p>Ahora dentro de redis, usaremos <code class="language-plaintext highlighter-rouge">HMSET</code> para establecer varios valores en una clave:</p>
 
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>HMSET c4rta first-name "{license.__init__.__globals__[secret_encoded]}" last-name hola username c4rta
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>HMSET GuxFiz first-name "{license.__init__.__globals__[secret_encoded]}" last-name hola username GuxFiz
 </code></pre></div></div>
 
-<p>En este caso, estamos estableciendo first-name, last-name y username en la clave “c4rta” dentro de una estructura hash, y el valor que le asignamos a first-name es <code class="language-plaintext highlighter-rouge">{license.init.globals[secret_encoded]}</code> donde estamos llamando a <code class="language-plaintext highlighter-rouge">secret_encoded</code> el cual es una variable en el archivo que analizamos y el cual contiene la licencia, que vendria siendo la contraseña, como se ve aca:</p>
+<p>En este caso, estamos estableciendo first-name, last-name y username en la clave “GuxFiz” dentro de una estructura hash, y el valor que le asignamos a first-name es <code class="language-plaintext highlighter-rouge">{license.init.globals[secret_encoded]}</code> donde estamos llamando a <code class="language-plaintext highlighter-rouge">secret_encoded</code> el cual es una variable en el archivo que analizamos y el cual contiene la licencia, que vendria siendo la contraseña, como se ve aca:</p>
 
 <div class="language-py highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">secret</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span><span class="p">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s">"/root/license/secret"</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span>
 <span class="n">secret_encoded</span> <span class="o">=</span> <span class="n">secret</span><span class="p">.</span><span class="n">encode</span><span class="p">()</span>
 </code></pre></div></div>
-<p>Asi que ahora si llamamos al archivo con la licencia <code class="language-plaintext highlighter-rouge">c4rta</code> nos debe de mostrar la contraseña de root <code class="language-plaintext highlighter-rouge">sudo /usr/bin/license -p c4rta</code></p>
+<p>Asi que ahora si llamamos al archivo con la licencia <code class="language-plaintext highlighter-rouge">GuxFiz</code> nos debe de mostrar la contraseña de root <code class="language-plaintext highlighter-rouge">sudo /usr/bin/license -p GuxFiz</code></p>
 
 <p><img src="/assets/img/htb-format/20.png" alt="" /></p>
 

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: ROPemporium split - Usando ROP para escribir en RDI
-author: c4rta
+author: GuxFiz
 date: 2023-01-15
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, ROP]

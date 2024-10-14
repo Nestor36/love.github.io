@@ -1,7 +1,7 @@
 ---
 layout: post
 title: ROP emporium callme - Llamando multiples funciones 
-author: c4rta
+author: GuxFiz
 date: 2023-04-24
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, ROP]
@@ -183,7 +183,7 @@ print(p.recvall().decode())
 Y ya tenemos la flag
 
 ```
-󰣇  c4rta /tmp/callme  python3 exploit.py
+󰣇  GuxFiz /tmp/callme  python3 exploit.py
 [+] Starting local process './callme': pid 15024
 [+] Receiving all data: Done (172B)
 [*] Process './callme' stopped with exit code 0 (pid 15024)

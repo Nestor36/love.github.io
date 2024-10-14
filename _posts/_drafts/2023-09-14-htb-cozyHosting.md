@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Cozy Hosting - OS Command Injection y SSH abuse
-author: c4rta
+author: GuxFiz
 date: 2023-09-14
 tags: [HTB, Command Injection]
 image: /assets/img/htb-cozyHosting/waifu.jpg
@@ -121,7 +121,7 @@ Si ponemos cualquier cosa en el formulario, nos sale un mensaje de error
 
 ![](/assets/img/htb-cozyHosting/3.png)
 
-Es curioso, por que puedo deducir que se esta intentando conectar por ssh a **c4rta**.
+Es curioso, por que puedo deducir que se esta intentando conectar por ssh a **GuxFiz**.
 
 Interceptare la peticion con burp y lo analizaremos mas a fondo
 
@@ -139,7 +139,7 @@ Es curioso por que ese comando se ejecuta como uno de sistema en la maquina vict
 
 ![](/assets/img/htb-cozyHosting/7.png)
 
-Observa como al final sale: **/bin/bash: line 1: whoami@c4rta: command not found**
+Observa como al final sale: **/bin/bash: line 1: whoami@GuxFiz: command not found**
 
 Ahora con esto sabemos que interpreta bash, y esto es potencialmente un **Command injection**
 

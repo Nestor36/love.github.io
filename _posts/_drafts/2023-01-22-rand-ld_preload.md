@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Hijack de rand() usando LD_PRELOAD trick
-author: c4rta
+author: GuxFiz
 date: 2023-01-22
 ##categories: [Explotacion binaria]
 tags: [Explotacion Binaria, ld_preload]

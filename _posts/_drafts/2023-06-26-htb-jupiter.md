@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Jupiter - SQLi a RCE, Movimiento lateral via Jupyter y YAML
-author: c4rta
+author: GuxFiz
 date: 2023-06-26
 ##categories: [Maquinas, HackTheBox]
 tags: [HTB, SQL injection, Movimiento Lateral]

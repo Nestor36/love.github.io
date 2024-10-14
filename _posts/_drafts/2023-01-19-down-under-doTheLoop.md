@@ -1,7 +1,7 @@
 ---
 layout: post
 title: DownUnderCTF Do The Loop - Analisis del espectrograma
-author: c4rta
+author: GuxFiz
 date: 2023-01-19
 ##categories: [Forense]
 tags: [Explotacion Binaria, Radio Frecuencias, Espectrograma]

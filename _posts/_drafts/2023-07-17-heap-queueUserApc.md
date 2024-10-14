@@ -1,7 +1,7 @@
 ---
 layout: post
 title: Shellcode almacenada en el heap e inyección vía APC injection y NtTestAlert en un proceso local
-author: c4rta
+author: GuxFiz
 date: 2023-07-17
 tags: [MalDev]
 image: /assets/img/heap-queue/waifu.jpg

@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox Squashed - NFS y X11
-author: c4rta
+author: GuxFiz
 date: 2023-04-05
 ##categories: [Maquinas, HackTheBox]
 tags: [HTB, NFS, X11]
@@ -166,7 +166,7 @@ Es lo mismo de arriba, solo que el UID es 2017
 Como extra, dentro dentro de la carpeta ```Documents``` de ```ross```, hay un archivo de un gestor de contraseñas que podriamos intentar crackear, pero les digo que no es por ahi
 
 ```
-󰣇  c4rta /mnt/ross  tree      
+󰣇  GuxFiz /mnt/ross  tree      
 .
 ├── Desktop
 ├── Documents

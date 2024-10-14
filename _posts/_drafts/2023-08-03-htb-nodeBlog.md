@@ -1,7 +1,7 @@
 ---
 layout: post
 title: HackTheBox NodeBlog - NoSQLi, XXE, y Deserialization Attack (IIFE)
-author: c4rta
+author: GuxFiz
 date: 2023-08-03
 tags: [HTB, NoSQLi, XXE, Insecure Deserialization]
 image: /assets/img/nodeBlog/waifu.png
@@ -76,7 +76,7 @@ Tambien tenemos un login que descubrimos cuando hicimos fuzzing
 
 ![](/assets/img/nodeBlog/2.png)
 
-Si probamos con credenciales random como lo puenden ser **c4rta** y **nose** nos dice que el usuario es invalido
+Si probamos con credenciales random como lo puenden ser **GuxFiz** y **nose** nos dice que el usuario es invalido
 
 ![](/assets/img/nodeBlog/3.png)
 
@@ -104,7 +104,7 @@ Connection: close
 Referer: http://10.10.11.139:5000/login
 Upgrade-Insecure-Requests: 1
 
-user=c4rta&password=nose
+user=GuxFiz&password=nose
 ```
 No hay mucho de destacar, podemos ver en el **Content-Type** que el contenido que estamos enviando es un formulario en URL encode, es una peticion POST, y demas, sin embargo, como estamos contra un login, siempre es bueno probar si existe una SQLi o NoSQLi para hacer **Authentication Bypass**, les puedo adelantar que mediante SQLi no se va a poder, y viendo por las tecnologias que hemos encontrado hasta ahora, es muy probable que use **MEAN stack**, asi que probaremos con NoSQLi
 

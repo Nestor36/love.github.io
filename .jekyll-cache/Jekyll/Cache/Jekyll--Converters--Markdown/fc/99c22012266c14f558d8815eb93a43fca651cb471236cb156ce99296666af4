@@ -62,8 +62,8 @@
 
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>passcode@pwnable:~$ ./passcode 
 Toddler's Secure Login System 1.0 beta.
-enter you name : c4rta
-Welcome c4rta!
+enter you name : GuxFiz
+Welcome GuxFiz!
 enter passcode1 : 338150
 Segmentation fault (core dumped)
 </code></pre></div></div>
@@ -139,11 +139,11 @@ DWORD PTR [ebp-0xc],0xcc07c9
 <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(gdb) r
 Starting program: /home/passcode/passcode 
 Toddler's Secure Login System 1.0 beta.
-enter you name : c4rta --&gt; Mi input
+enter you name : GuxFiz --&gt; Mi input
 
 Breakpoint 1, 0x08048643 in welcome ()
 (gdb) x/1s $ebp-0x70
-0xffa1a2c8:	"c4rta" --&gt; El valor que tiene
+0xffa1a2c8:	"GuxFiz" --&gt; El valor que tiene
 (gdb) 
 </code></pre></div></div>
 
