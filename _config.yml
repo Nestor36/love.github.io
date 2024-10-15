@@ -2,7 +2,7 @@
 # General Site Settings
 title: GuxFiz
 logo: # You can add own logo. For example '/images/logo.png'.
-description: Average nerd who loves cybersecurity
+description: I am a nerd who learns extremely quickly and likes to program ♥
 baseurl: "" # The subpath of your site, e.g. /blog
 url: "https://nestor36.github.io" # The base hostname & protocol for your site, e.g. http://example.com
 
