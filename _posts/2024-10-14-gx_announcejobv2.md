@@ -144,8 +144,7 @@ If you want to be able to use the ad exports, you must refer to gx_announcejobv2
 
 <div class="gallery-box">
 <div class="gallery">
-    <img src="https://i.ibb.co/pbtBmd5/imagen.png">
-
+    <img src="https://i.ibb.co/xHDPS5d/imagen.png">
 </div>
 <em>ScreenShot of gx_announcejobv2</a></em>
 </div>
