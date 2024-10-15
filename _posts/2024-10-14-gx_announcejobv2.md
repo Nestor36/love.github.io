@@ -4,7 +4,7 @@ title: gx_announcejobv2
 author: GuxFiz
 date: 2024-10-14
 tags: [FIVEM, ESX, QB, LUA, HTML, CSS, JS]
-image: /assets/GX_img/banners/gx_announcejobv2.png
+image: /assets/img/banners/gx_announcejobv2.png
 description: "Fully configurable and modifiable worker announcement system for events on your server!"
 ---
 # INSTALLATION
