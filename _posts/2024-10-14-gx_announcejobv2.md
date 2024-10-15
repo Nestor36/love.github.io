@@ -21,7 +21,7 @@ ensure gx_announcejobv2
 ## Configuration
 Easy Configuration!! 🐧
 
-```ruby
+```
 options = {
     Command = "anuncio", -- /anuncio Welcome testing
     jobs = {
