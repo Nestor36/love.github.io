@@ -24,89 +24,144 @@ Easy Configuration!! 🐧
 ```
 options = {
     Command = "anuncio", -- /anuncio Welcome testing
+    cooldown = 30, -- Cooldown seconds
     jobs = {
-        ['police'] = {
-            profile = "https://eclipse-rp.net/images/desktop/social/fb-character.png",
-            title = "POLICIA DE LOS SANTOS",
+        ['police'] = { -- job
+            profile = "https://pbs.twimg.com/media/EiIv4AZXkAE8YZ0.png", -- nil | 'url'
+            title = "POLICE DEPARTMENT", -- 'text'
             timer = {
-                duration = 10,-- seconds
-                cooldown = 0,-- seconds
+                duration = 25, -- Duration of announce in seconds
             },
             sound = {
-                sound = "./music/2.wav", -- none
-                soundVolume = 0.2,
+                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
+                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
             },
             style = {
-                theme = 1,
-                sizeNui= 1.5, 
-                position= "topCenter",
-                background= "https://c4.wallpaperflare.com/wallpaper/606/513/92/grand-theft-auto-gta-police-cops-hd-wallpaper-preview.jpg",
-                colors = { 
-                    color1 ="#0077fff8", 
-                    title = "blue", 
-                    description= "white",
+                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
+                sizeNui = 1.2, -- Aument Nui : min 0.5 max 1.5 
+                position = "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
+                background = "https://t3.ftcdn.net/jpg/06/35/76/34/360_F_635763412_CUTNSVV8R7s5yPBsNwdRS5YuRGbojFav.jpg", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+                colors = {
+                    color1 ="rgba(208, 182, 88, 0.8)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    title = "rgba(190, 162, 61, 0.8)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    description= "white",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
                 },
                 anim = {
-                    _start = "swing",
-                    _end   = "wobble",
+                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
                 },
             }
         },
-        ['ambulance'] = {
-            profile = "https://clipart-library.com/data_images/203064.png",
-            title = "EMS DE LOS SANTOS",
+        ['ambulance'] = { -- job
+            profile = "https://firelandsambulance.org/wp-content/uploads/2013/04/Firelands-EMT-Patch-1.png", -- nil | 'url'
+            title = "LOS SANTOS AMBULANCE", -- 'text'
             timer = {
-                duration = 5,-- seconds
-                cooldown = 0,-- seconds
+                duration = 25, -- Duration of announce in seconds
             },
             sound = {
-                sound = "./music/1.wav",
-                soundVolume = 0.2,
+                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
+                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
             },
             style = {
-                theme = 1,
-                sizeNui= 1.5, 
-                position= "topCenter",
-                background= "https://store-images.s-microsoft.com/image/apps.65175.66515090704019777.c95568d5-8811-4e30-a0f2-3ac354b35880.ebbf3fdc-573d-4960-9d0c-7aec0f854ff3?q=90&w=480&h=270",
+                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
+                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
+                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
+                background= "rgba(216, 22, 30, 0.7)", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
                 colors = { 
-                    color1="#0077fff8", 
-                    title = "#0077fff8", 
-                    description= "#fff",
+                    color1 ="#D63438", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    title = "#1B1A6C", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    description= "#FFFFFF",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
                 },
                 anim = {
-                    _start = "swing",
-                    _end   = "wobble",
+                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
                 },
             }
         },
-        ['taxi'] = {
-            profile = "https://clipart-library.com/data_images/203064.png",
-            title = "POLICIA DE LOS SANTOS",
+        ['mechanic'] = { -- job
+            profile = "https://static.wikia.nocookie.net/logopedia/images/6/69/Los_Santos_Customs_%28Alt%29.png", -- nil | 'url'
+            title = "LOS SANTOS CUSTOMS", -- 'text'
             timer = {
-                duration = 1,-- seconds
-                cooldown = 30,-- seconds
+                duration = 25, -- Duration of announce in seconds
             },
             sound = {
-                sound = "./music/1.wav",
-                soundVolume = 0.2,
+                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
+                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
             },
             style = {
-                theme = 1,
-                sizeNui= 1.5, 
-                position= "topCenter",
-                background= "https://store-images.s-microsoft.com/image/apps.65175.66515090704019777.c95568d5-8811-4e30-a0f2-3ac354b35880.ebbf3fdc-573d-4960-9d0c-7aec0f854ff3?q=90&w=480&h=270",
+                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
+                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
+                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
+                background= "rgba(31, 26, 90, 0.7)", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
                 colors = { 
-                    color1="#0077fff8", 
-                    title = "#0077fff8", 
-                    description= "#fff",
+                    color1 ="rgba(31, 26, 90, 0.9)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    title = "#FFF000", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    description= "#FFFFFF",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
                 },
                 anim = {
-                    _start = "swing",
-                    _end   = "wobble",
+                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                },
+            }
+        },
+        ['taxi'] = { -- job
+            profile = "https://i.servimg.com/u/f11/19/77/62/97/84620_10.png", -- nil | 'url'
+            title = "DOWNTOWN CAB CO.", -- 'text'
+            timer = {
+                duration = 25, -- Duration of announce in seconds
+            },
+            sound = {
+                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
+                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+            },
+            style = {
+                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
+                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
+                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
+                background= "rgba(255, 204, 0, 0.7)", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+                colors = { 
+                    color1 ="rgba(255, 204, 0, 0.9)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    title = "#010306", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    description= "#FD430A",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                },
+                anim = {
+                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                },
+            }
+        },
+        ['bahama'] = { -- job
+            profile = "https://static.wikia.nocookie.net/igniteroleplay/images/7/7b/BMsPinkLogo.png", -- nil | 'url'
+            title = "BUSINESS: BAHAMA MAMAS", -- 'text'
+            timer = {
+                duration = 25, -- Duration of announce in seconds
+            },
+            sound = {
+                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
+                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+            },
+            style = {
+                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
+                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
+                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
+                background= "black", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+                colors = { 
+                    color1 ="rgba(245, 40, 145, 0.8)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    title = "rgba(245, 40, 145, 0.8)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    description= "white",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                },
+                anim = {
+                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
                 },
             }
         },
     }
+}
+
+Translate = {
+    ["cooldown"] = "You must wait %s second/s",
+    ["notJob"] = "Your Work is not allowed to use this",
 }
 ```
 
@@ -166,7 +221,18 @@ If you want to be able to use the ad exports, you must refer to gx_announcejobv2
 
 <div class="gallery-box">
 <div class="gallery">
-    <img src="/assets/img/2024-10-14-gx_announcejobv2/1.png">
+    <img src="/assets/img/2024-10-14-gx_announcejobv2/1.png"/>
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518372187701300/image.png?ex=67129454&is=671142d4&hm=77eb1e1548beabfd3608a4e683213b66f3d698743b1c63e73429447205161c88&=&format=webp&quality=lossless"/>
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518372749611098/image.png?ex=67129454&is=671142d4&hm=a1e9506adfb18fb8b34ce6b165f6ac365ec08c804eded61cc0d7ba6bddb30fbd&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373064310855/image.png?ex=67129454&is=671142d4&hm=b450476b2d8e5f6f3d5a88ec9a8e62306d42ac777855c76033a68141570ba97d&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373282152478/image.png?ex=67129454&is=671142d4&hm=202caee618970488b53f6d60e130695b6aac57ea13fa62543372f19f3a275f12&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296519032580735133/image.png?ex=671294f1&is=67114371&hm=e0c82bc6538d3b9ab723e0f6c749000d3074d10a061d8c361e92f9c4bef86c45&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373554917396/image.png?ex=67129454&is=671142d4&hm=59e82402a86b2685e76085d78b3d82ef773d3aecf6e1b9a8c575f3c21bf04fde&=&format=webp&quality=lossless&width=500&height=670">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373785731174/image.png?ex=67129454&is=671142d4&hm=7c0035f2c6e0d81de2477d8bbd1c974cc606bb3cb473a2866ce08a3108145803&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518374100041769/image.png?ex=67129454&is=671142d4&hm=12072e5b0f49fbbd5d3236def5516d17ca8e26e2e4340d82e91ba3711ad58e05&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518374347640832/image.png?ex=67129454&is=671142d4&hm=2f07f14edec8a400b8d7eb09c82ea1195bb421b36c44b841442caa51fd7141e4&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296519170552369183/image.png?ex=67129512&is=67114392&hm=d4e1041255120cd9cfe6bc951bf6ff9e474667abdb8ba0d4d2e81b042914bf02&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518382484721695/image.png?ex=67129456&is=671142d6&hm=75c5d7dafcfce306db2a61dd7baaae236f9666307ce755e550b2de81e8e11a0e&=&format=webp&quality=lossless">
 </div>
 <em><a>ScreenShot of gx_announcejobv2</a></em>
 </div>
