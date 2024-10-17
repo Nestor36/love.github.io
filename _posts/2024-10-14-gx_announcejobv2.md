@@ -114,28 +114,50 @@ options = {
 
 If you want to be able to use the ad exports, you must refer to gx_announcejobv2/shared/custom.lua, to see what designs there are, and how to add more!
 ```ruby
+> Using in client
     exports.gx_announcejobv2:Announce({
-        theme = 'custom',
-        profile = 'https://media.tenor.com/dE-mXqu8cnMAAAAj/anonymous-man.gif',
-        title = 'tittle',
-        description = "this is a message",
+        theme = 'custom', -- gx_announcejobv2/shared/custom.lua
+        profile = 'https://media.tenor.com/dE-mXqu8cnMAAAAj/anonymous-man.gif', -- nil | 'url'
+        title = 'tittle', -- 'text'
+        description = "this is a message", -- 'text'
         timer = {
-            duration = 10,-- seconds
-            cooldown = 0,-- seconds
+            duration = 10, -- Duration of announce in seconds
         },
         sound = {
-            sound = "./music/2.wav",
-            soundVolume = 0.2,
+            sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
+            soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
         },
         style = {
-            background = "white",
-            theme = 1,
-            sizeNui= 1.5, 
-            position= "center",
+            background = "white", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+            sizeNui= 1.5, -- Aument Nui : min 0.5 max 1.5 
+            position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
             anim = {
-                _start = "swing",
-                _end   = "wobble",
-            },
+                _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+            }, 
+        }
+    })
+> Using in server
+    TriggerClientEvent('gx_announcejobv2:Announce', source, {
+        theme = 'anonymous', -- gx_announcejobv2/shared/custom.lua
+        profile = 'https://media.tenor.com/dE-mXqu8cnMAAAAj/anonymous-man.gif', -- nil | 'url'
+        title = 'tittle', -- 'text'
+        description = "this is a message", -- 'text'
+        timer = {
+            duration = 10, -- Duration of announce in seconds
+        },
+        sound = {
+            sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
+            soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+        },
+        style = {
+            background = "white", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+            sizeNui= 1.5, -- Aument Nui : min 0.5 max 1.5 
+            position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
+            anim = {
+                _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+            }, 
         }
     })
 ```
@@ -144,7 +166,7 @@ If you want to be able to use the ad exports, you must refer to gx_announcejobv2
 
 <div class="gallery-box">
 <div class="gallery">
-    <img src="https://i.ibb.co/xHDPS5d/imagen.png">
+    <img src="/assets/img/2024-10-14-gx_announcejobv2/1.png">
 </div>
-<em>ScreenShot of gx_announcejobv2</a></em>
+<em><a>ScreenShot of gx_announcejobv2</a></em>
 </div>
