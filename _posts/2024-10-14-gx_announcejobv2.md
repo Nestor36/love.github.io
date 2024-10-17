@@ -52,107 +52,107 @@ options = {
                 },
             }
         },
-        ['ambulance'] = { -- job
-            profile = "https://firelandsambulance.org/wp-content/uploads/2013/04/Firelands-EMT-Patch-1.png", -- nil | 'url'
-            title = "LOS SANTOS AMBULANCE", -- 'text'
+        ['ambulance'] = {
+            profile = "https://firelandsambulance.org/wp-content/uploads/2013/04/Firelands-EMT-Patch-1.png", 
+            title = "LOS SANTOS AMBULANCE", 
             timer = {
-                duration = 25, -- Duration of announce in seconds
+                duration = 25, 
             },
             sound = {
-                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
-                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+                sound = "./music/2.wav", 
+                soundVolume = 0.2, 
             },
             style = {
-                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
-                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
-                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
-                background= "rgba(216, 22, 30, 0.7)", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+                theme = 2, 
+                sizeNui= 1.2,
+                position= "topCenter", 
+                background= "rgba(216, 22, 30, 0.7)",
                 colors = { 
-                    color1 ="#D63438", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    title = "#1B1A6C", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    description= "#FFFFFF",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    color1 ="#D63438", 
+                    title = "#1B1A6C",
+                    description= "#FFFFFF",  
                 },
                 anim = {
-                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
-                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _start = "swing",
+                    _end   = "wobble", 
                 },
             }
         },
-        ['mechanic'] = { -- job
-            profile = "https://static.wikia.nocookie.net/logopedia/images/6/69/Los_Santos_Customs_%28Alt%29.png", -- nil | 'url'
-            title = "LOS SANTOS CUSTOMS", -- 'text'
+        ['mechanic'] = { 
+            profile = "https://static.wikia.nocookie.net/logopedia/images/6/69/Los_Santos_Customs_%28Alt%29.png", 
+            title = "LOS SANTOS CUSTOMS", 
             timer = {
-                duration = 25, -- Duration of announce in seconds
+                duration = 25, 
             },
             sound = {
-                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
-                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+                sound = "./music/2.wav",
+                soundVolume = 0.2, 
             },
             style = {
-                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
-                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
-                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
-                background= "rgba(31, 26, 90, 0.7)", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+                theme = 2,
+                sizeNui= 1.2,
+                position= "topCenter", 
+                background= "rgba(31, 26, 90, 0.7)", 
                 colors = { 
-                    color1 ="rgba(31, 26, 90, 0.9)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    title = "#FFF000", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    description= "#FFFFFF",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    color1 ="rgba(31, 26, 90, 0.9)", 
+                    title = "#FFF000",
+                    description= "#FFFFFF",  
                 },
                 anim = {
-                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
-                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _start = "swing", 
+                    _end   = "wobble", 
                 },
             }
         },
-        ['taxi'] = { -- job
-            profile = "https://i.servimg.com/u/f11/19/77/62/97/84620_10.png", -- nil | 'url'
-            title = "DOWNTOWN CAB CO.", -- 'text'
+        ['taxi'] = { 
+            profile = "https://i.servimg.com/u/f11/19/77/62/97/84620_10.png",
+            title = "DOWNTOWN CAB CO.", 
             timer = {
-                duration = 25, -- Duration of announce in seconds
+                duration = 25,
             },
             sound = {
-                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
-                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+                sound = "./music/2.wav",
+                soundVolume = 0.2, 
             },
             style = {
-                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
-                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
-                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
-                background= "rgba(255, 204, 0, 0.7)", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+                theme = 2, 
+                sizeNui= 1.2, 
+                position= "topCenter", 
+                background= "rgba(255, 204, 0, 0.7)",   
                 colors = { 
-                    color1 ="rgba(255, 204, 0, 0.9)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    title = "#010306", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    description= "#FD430A",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    color1 ="rgba(255, 204, 0, 0.9)", 
+                    title = "#010306", 
+                    description= "#FD430A",  
                 },
                 anim = {
-                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
-                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _start = "swing", 
+                    _end   = "wobble", 
                 },
             }
         },
-        ['bahama'] = { -- job
-            profile = "https://static.wikia.nocookie.net/igniteroleplay/images/7/7b/BMsPinkLogo.png", -- nil | 'url'
-            title = "BUSINESS: BAHAMA MAMAS", -- 'text'
+        ['bahama'] = {
+            profile = "https://static.wikia.nocookie.net/igniteroleplay/images/7/7b/BMsPinkLogo.png", 
+            title = "BUSINESS: BAHAMA MAMAS",
             timer = {
-                duration = 25, -- Duration of announce in seconds
+                duration = 25, 
             },
             sound = {
-                sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
-                soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+                sound = "./music/2.wav",
+                soundVolume = 0.2, 
             },
             style = {
-                theme = 2, -- 1 | 2 | 3 | 4 | 5 | 6 | 7  
-                sizeNui= 1.2, -- Aument Nui : min 0.5 max 1.5 
-                position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
-                background= "black", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
+                theme = 2, 
+                sizeNui= 1.2, 
+                position= "topCenter",
+                background= "black", 
                 colors = { 
-                    color1 ="rgba(245, 40, 145, 0.8)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    title = "rgba(245, 40, 145, 0.8)", -- 'color' | 'rgb' | 'rgba' | '#HEX'
-                    description= "white",  -- 'color' | 'rgb' | 'rgba' | '#HEX'
+                    color1 ="rgba(245, 40, 145, 0.8)", 
+                    title = "rgba(245, 40, 145, 0.8)", 
+                    description= "white", 
                 },
                 anim = {
-                    _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
-                    _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                    _start = "swing", 
+                    _end   = "wobble",
                 },
             }
         },
@@ -163,6 +163,9 @@ Translate = {
     ["cooldown"] = "You must wait %s second/s",
     ["notJob"] = "Your Work is not allowed to use this",
 }
+
+Webhook = "https://discord.com/api/webhooks/1296593670061162517/RteLrlyJOEWJqthIGoJmSBSdvL616gDA92D7g2xQF6zbudeICZRtaEUUVuakzUvuD7mx" -- nil | webhook
+
 ```
 
 ## Exports
@@ -171,24 +174,24 @@ If you want to be able to use the ad exports, you must refer to gx_announcejobv2
 ```ruby
 > Using in client
     exports.gx_announcejobv2:Announce({
-        theme = 'custom', -- gx_announcejobv2/shared/custom.lua
-        profile = 'https://media.tenor.com/dE-mXqu8cnMAAAAj/anonymous-man.gif', -- nil | 'url'
-        title = 'tittle', -- 'text'
-        description = "this is a message", -- 'text'
+        theme = 'custom', 
+        profile = 'https://media.tenor.com/dE-mXqu8cnMAAAAj/anonymous-man.gif',
+        title = 'tittle',
+        description = "this is a message", 
         timer = {
-            duration = 10, -- Duration of announce in seconds
+            duration = 10, 
         },
         sound = {
-            sound = "./music/2.wav", -- nil | ./music/1.wav | Add sound here => gx_announcejobv2\web\music\1.wav
-            soundVolume = 0.2, -- recommend 0.2  | Volume min 0.1 max 0.5
+            sound = "./music/2.wav", 
+            soundVolume = 0.2, 
         },
         style = {
-            background = "white", -- 'url' | 'color' | 'rgb' | 'rgba' | '#HEX'  
-            sizeNui= 1.5, -- Aument Nui : min 0.5 max 1.5 
-            position= "topCenter", -- topLeft | topRight | middleLeft | middleRight | bottomLeft | bottomRight | center | topCenter | bottomCenter
+            background = "white",
+            sizeNui= 1.5,
+            position= "topCenter", 
             anim = {
-                _start = "swing", -- effect start nui : https://www.theappguruz.com/tag-tools/web/CSSAnimations/
-                _end   = "wobble", -- effect end nui: https://www.theappguruz.com/tag-tools/web/CSSAnimations/
+                _start = "swing", 
+                _end   = "wobble", 
             }, 
         }
     })
