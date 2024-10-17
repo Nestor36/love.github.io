@@ -224,9 +224,9 @@ If you want to be able to use the ad exports, you must refer to gx_announcejobv2
 
 <div class="gallery-box">
 <div class="gallery">
-    <img src="/assets/img/2024-10-14-gx_announcejobv2/1.png"/>
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518372187701300/image.png?ex=67129454&is=671142d4&hm=77eb1e1548beabfd3608a4e683213b66f3d698743b1c63e73429447205161c88&=&format=webp&quality=lossless"/>
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518372749611098/image.png?ex=67129454&is=671142d4&hm=a1e9506adfb18fb8b34ce6b165f6ac365ec08c804eded61cc0d7ba6bddb30fbd&=&format=webp&quality=lossless">
+    <img src="/assets/img/2024-10-14-gx_announcejobv2/1.png"/>
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373064310855/image.png?ex=67129454&is=671142d4&hm=b450476b2d8e5f6f3d5a88ec9a8e62306d42ac777855c76033a68141570ba97d&=&format=webp&quality=lossless">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373282152478/image.png?ex=67129454&is=671142d4&hm=202caee618970488b53f6d60e130695b6aac57ea13fa62543372f19f3a275f12&=&format=webp&quality=lossless">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296519032580735133/image.png?ex=671294f1&is=67114371&hm=e0c82bc6538d3b9ab723e0f6c749000d3074d10a061d8c361e92f9c4bef86c45&=&format=webp&quality=lossless">
@@ -240,3 +240,6 @@ If you want to be able to use the ad exports, you must refer to gx_announcejobv2
 </div>
 <em><a>ScreenShot of gx_announcejobv2</a></em>
 </div>
+
+![](https://media.discordapp.net/attachments/1242112317953540218/1296614144732037163/image.png?ex=6712ed86&is=67119c06&hm=dd2dba0f0a45e73ec7e8b4cb79e958be660db95ea6cb4c424580f97cc4b7412e&=&format=webp&quality=lossless&width=512&height=671)
+*Log Discord*
