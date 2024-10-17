@@ -230,12 +230,13 @@ If you want to be able to use the ad exports, you must refer to gx_announcejobv2
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373064310855/image.png?ex=67129454&is=671142d4&hm=b450476b2d8e5f6f3d5a88ec9a8e62306d42ac777855c76033a68141570ba97d&=&format=webp&quality=lossless">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373282152478/image.png?ex=67129454&is=671142d4&hm=202caee618970488b53f6d60e130695b6aac57ea13fa62543372f19f3a275f12&=&format=webp&quality=lossless">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296519032580735133/image.png?ex=671294f1&is=67114371&hm=e0c82bc6538d3b9ab723e0f6c749000d3074d10a061d8c361e92f9c4bef86c45&=&format=webp&quality=lossless">
-    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373554917396/image.png?ex=67129454&is=671142d4&hm=59e82402a86b2685e76085d78b3d82ef773d3aecf6e1b9a8c575f3c21bf04fde&=&format=webp&quality=lossless&width=500&height=670">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373785731174/image.png?ex=67129454&is=671142d4&hm=7c0035f2c6e0d81de2477d8bbd1c974cc606bb3cb473a2866ce08a3108145803&=&format=webp&quality=lossless">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518374100041769/image.png?ex=67129454&is=671142d4&hm=12072e5b0f49fbbd5d3236def5516d17ca8e26e2e4340d82e91ba3711ad58e05&=&format=webp&quality=lossless">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518374347640832/image.png?ex=67129454&is=671142d4&hm=2f07f14edec8a400b8d7eb09c82ea1195bb421b36c44b841442caa51fd7141e4&=&format=webp&quality=lossless">
-    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296519170552369183/image.png?ex=67129512&is=67114392&hm=d4e1041255120cd9cfe6bc951bf6ff9e474667abdb8ba0d4d2e81b042914bf02&=&format=webp&quality=lossless">
     <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518382484721695/image.png?ex=67129456&is=671142d6&hm=75c5d7dafcfce306db2a61dd7baaae236f9666307ce755e550b2de81e8e11a0e&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296519170552369183/image.png?ex=67129512&is=67114392&hm=d4e1041255120cd9cfe6bc951bf6ff9e474667abdb8ba0d4d2e81b042914bf02&=&format=webp&quality=lossless">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296518373554917396/image.png?ex=67129454&is=671142d4&hm=59e82402a86b2685e76085d78b3d82ef773d3aecf6e1b9a8c575f3c21bf04fde&=&format=webp&quality=lossless&width=500&height=670">
+    <img src="https://media.discordapp.net/attachments/1242112317953540218/1296614144732037163/image.png?ex=6712ed86&is=67119c06&hm=dd2dba0f0a45e73ec7e8b4cb79e958be660db95ea6cb4c424580f97cc4b7412e&=&format=webp&quality=lossless&width=512&height=671">
 </div>
 <em><a>ScreenShot of gx_announcejobv2</a></em>
 </div>
