@@ -1,8 +1,20 @@
 ---
 layout: page
-title: Sobre Mi
+title: Team
 permalink: /about/
 image: 'https://w.wallhaven.cc/full/rr/wallhaven-rrdgp1.jpg'
 ---
 
-Hola, Soy Nestor, más conocido como **GuxFiz**, Muchas gracias por seguir mi trabajo, y poder apoyar! ♥
+# Team Development
+
+- **Developer FullStack :** GuxFiz
+- **Design and Ux :** Runa
+
+
+# About
+
+Hola, muchas gracias por seguir nuestro trabajo, nos encanta el desarrollo, por lo que intentamos ofrecer lo mejor que podemos a un costo accesible.
+
+# Discord
+
+- **[DISCORD HERE](https://discord.gg/kncN7Fr5KT)**
