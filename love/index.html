@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vane y Nestor</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.1.2/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+
+        font-family: Arial, sans-serif;
+        background-size: 100%;
+        background-repeat: no-repeat;
+      }
+
+      #body {
+        background-image: linear-gradient(
+            rgba(0, 0, 0, 0.6),
+            rgba(0, 0, 0, 0.2)
+          ),
+          url("https://images6.alphacoders.com/118/1184847.jpg");
+      }
+
+      .card {
+        width: 100%;
+        max-width: 400px;
+        background: white;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0px -1px 26px 0px rgba(255, 0, 136, 1);
+        -webkit-box-shadow: 0px -1px 26px 0px rgba(255, 0, 136, 1);
+        -moz-box-shadow: 0px -1px 26px 0px rgba(255, 0, 136, 1);
+      }
+
+      .title {
+        font-size: 24px;
+        color: #db7093;
+        margin-bottom: 20px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .card-button {
+        width: 100%;
+        height: 60px;
+        font-size: 24px;
+        cursor: pointer;
+        border: none;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+      }
+
+      .card-button.flipped {
+        background-color: #ffc0cb;
+        color: #db7093;
+      }
+
+      .card-button.unflipped {
+        background-color: #db7093;
+        color: white;
+      }
+
+      .button-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 10px;
+      }
+
+      .moves {
+        color: #db7093;
+        font-weight: bold;
+      }
+
+      .new-game-button {
+        background-color: #db7093;
+        color: white;
+        border: none;
+        padding: 8px 12px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+
+      .new-game-button:hover {
+        background-color: #ff69b4;
+      }
+
+      .message {
+        color: #228b22;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: scale(0.9);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        justify-content: center;
+        align-items: center;
+        animation: fadeIn 0.3s ease;
+      }
+
+      .modal-content {
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 8px;
+        width: 300px;
+        text-align: center;
+        opacity: 0;
+        animation: fadeIn 0.3s ease forwards;
+        box-shadow: 0px -1px 26px 0px rgba(255, 0, 136, 1);
+        -webkit-box-shadow: 0px -1px 26px 0px rgba(255, 0, 136, 1);
+        -moz-box-shadow: 0px -1px 26px 0px rgba(255, 0, 136, 1);
+      }
+
+      .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 20px;
+        cursor: pointer;
+      }
+
+      .heart {
+        position: absolute;
+        top: -10px;
+        color: red;
+        font-size: 20px;
+        opacity: 0.8;
+        animation: fall linear infinite;
+      }
+
+      @keyframes fall {
+        to {
+          transform: translateY(90vh);
+          opacity: 0;
+        }
+      }
+
+      @keyframes beat {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.1);
+        }
+      }
+      @keyframes beat-fast {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 0.5;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 0;
+        }
+      }
+      .animate-beat {
+        animation: beat 1s ease-in-out infinite;
+      }
+      .animate-beat-fast {
+        animation: beat-fast 1s ease-in-out infinite;
+      }
+      .animate-fade-in {
+        animation: fade-in 2s ease-in-out;
+      }
+
+      .custom-span {
+        background-color: white;
+        border-radius: 25px;
+        padding: 8px 16px;
+        color: #ff1493;
+        font-weight: bold;
+        transition: all 0.3s ease;
+      }
+
+      .custom-span:hover {
+        border-radius: 0;
+        background-color: #ff1493;
+        color: white;
+      }
+
+      #happy {
+        justify-content: center;
+        text-align: center;
+        background: url("https://www.icegif.com/wp-content/uploads/2023/07/icegif-137.gif");
+        background-size: 100px;
+      }
+      .pdfdiv {
+        justify-content: center;
+        text-align: center;
+      }
+
+      #contpp {
+        display: none;
+      }
+      /* Estilo para el contador */
+      #countdown {
+        font-size: 30px;
+        color: rgb(255, 0, 170);
+        font-family: "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS",
+          sans-serif;
+      }
+    </style>
+  </head>
+  <body id="body">
+    <div id="countdown"></div>
+    <div id="contpp">
+      <div class="card">
+        <h1 class="title">14/11/2024</h1>
+        <div class="grid" id="gameGrid"></div>
+        <div class="button-row">
+          <p class="moves">Movimientos: <span id="moveCount">0</span></p>
+          <button
+            id="openModalBtn"
+            class="new-game-button"
+            onclick="initializeGame()"
+          >
+            Quieres rendirte? Click aquí..
+          </button>
+        </div>
+        <p class="message" id="completionMessage"></p>
+        <div id="happy" style="display: none">
+          <button
+            class="new-game-button"
+            id="winner-love"
+            onclick="GalleryUI()"
+          >
+            💗Ganaste mi amor💗<br />
+            Click Aquí
+          </button>
+        </div>
+      </div>
+
+      <div id="modal" class="modal">
+        <div class="modal-content">
+          <span class="close-btn" id="closeModalBtn">&times;</span>
+          <h2>Ya sabía yo.. jaja xD</h2>
+          <p>
+            <img
+              style="width: 25px; height: 25px"
+              src="https://media.tenor.com/pWhwRWoyxgIAAAAj/pepe-peepo.gif"
+            />
+            Le falta mushasha le falta
+          </p>
+          <img
+            style="width: 250px; height: 250px"
+            src="https://i.pinimg.com/originals/80/93/e5/8093e54fae73fa59f2d2b48b891b32cb.gif"
+          />
+        </div>
+      </div>
+    </div>
+    <script>
+      // Fecha objetivo (14 de noviembre de 2024)
+      const targetDate = new Date("November 14, 2024 00:00:00").getTime();
+
+      // Función para mostrar el contador y controlar la visibilidad del contenido
+      function updatePage() {
+        const now = new Date().getTime();
+        const timeLeft = targetDate - now;
+
+        if (timeLeft <= 0) {
+          // Si la fecha objetivo ya pasó, mostrar el contenido
+          document.getElementById("body").style.backgroundImage =
+            'linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.2)), url("background.png")';
+          document.getElementById("contpp").style.display = "block";
+          document.getElementById("countdown").style.display = "none"; // Ocultar el contador
+        } else {
+          // Mostrar el contador de cuenta regresiva
+          const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+          const hours = Math.floor(
+            (timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+          );
+          const minutes = Math.floor(
+            (timeLeft % (1000 * 60 * 60)) / (1000 * 60)
+          );
+          const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+          document.getElementById("countdown").innerHTML = `
+          <div>
+            <img style="justify-content:center; align-text:center; border: 12px solid pink;" src="https://gifdb.com/images/high/anime-love-couple-mekakucity-actors-qvpzbqanvkjj6t1y.gif" />
+          </div>
+       Cuenta regresiva: ${days} días, ${hours} horas, ${minutes} minutos, ${seconds} segundos`;
+        }
+      }
+
+      // Llamar a la función de actualización cada segundo
+      setInterval(updatePage, 1000);
+
+      // Inicializar la página
+      updatePage();
+
+      function GalleryUI() {
+        let dd = document.getElementById("body");
+        dd.innerHTML = "";
+
+        let htmlContent = `
+          <body class="bg-pink-50 min-h-screen flex flex-col items-center justify-center">
+          <div id="love-gallery" class="w-full max-w-4xl bg-white shadow-lg rounded-lg">
+            <div class="p-6">
+              <h1 class="text-3xl font-bold text-pink-600 mb-6 text-center">Vane y Jair</h1>
+
+              <div class="relative mb-6">
+                <img id="current-image" src="./gallery/1.jpg?height=400&width=600" alt="Imagen principal" class="w-full h-64 object-cover rounded-lg cursor-pointer" onclick="openModal()" />
+                <!--
+                <button id="previd" class="absolute top-1/2 left-2 transform -translate-y-1/2 bg-white/80 hover:bg-white" onclick="prevImage() disabled">
+                  <span class="custom-span">&lt;</span>
+                </button>
+                <button id="nexid" class="absolute top-1/2 right-2 transform -translate-y-1/2 bg-white/80 hover:bg-white" onclick="nextImage() disabled">
+                  <span class="custom-span">&gt;</span>
+                </button>
+                -->
+              </div>
+
+              <div class="grid grid-cols-3 sm:grid-cols-6 gap-2" id="thumbnail-grid">
+              </div>
+            </div>
+            <div class="pdfdiv">
+              <a href="love.pdf" target="_blank">
+              <button id="downloadButton" type="button" class="focus:outline-none text-white bg-yellow-400 hover:bg-yellow-500 focus:ring-4 focus:ring-yellow-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:focus:ring-yellow-900"
+              >Click Aquí para descargar un PDF :)</button>
+              </a>
+            </div>
+          </div>
+
+          <div id="modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+            <div class="relative max-w-4xl max-h-full">
+              <img id="modal-image" src="" alt="Imagen grande" class="max-w-full max-h-[90vh] object-contain" />
+              <button class="absolute top-2 right-2 bg-white/80 hover:bg-white" onclick="closeModal()">
+                <span class="custom-span">X </span>
+              </button>
+            </div>
+          </div>
+          
+        
+        `;
+        dd.innerHTML += htmlContent;
+
+        document
+          .getElementById("openButton")
+          .addEventListener("click", function () {
+            window.open("love.pdf", "_blank"); // Abre el PDF en una nueva ventana o pestaña
+          });
+      }
+
+      const loveImages = [
+        {
+          src: "./gallery/1.jpg?height=400&width=600",
+          alt: "Romantic couple",
+        },
+        {
+          src: "./gallery/2.jpg?height=400&width=600",
+          alt: "Heart-shaped object",
+        },
+        {
+          src: "./gallery/3.jpg?height=400&width=600",
+          alt: "Romantic dinner",
+        },
+        { src: "./gallery/4.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/5.jpg?height=400&width=600", alt: "Wedding rings" },
+        {
+          src: "./gallery/6.jpg?height=400&width=600",
+          alt: "Bouquet of roses",
+        },
+        { src: "./gallery/7.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/8.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/9.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/10.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/11.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/12.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/13.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/14.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/15.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/16.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/17.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/18.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/19.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/20.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/21.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/22.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/23.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/24.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/25.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/26.jpg?height=400&width=600", alt: "Love letter" },
+        { src: "./gallery/27.jpg?height=400&width=600", alt: "Love letter" },
+      ];
+
+      let currentImageIndex = 0;
+      let loading = true;
+
+      function loadImages() {
+        Promise.all(loveImages.map(loadImage))
+          .then(() => {
+            loading = false;
+            renderThumbnails();
+            renderCurrentImage();
+          })
+          .catch((error) => console.error("Error loading images", error));
+      }
+
+      function loadImage(image) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.src = image.src;
+          img.onload = () => resolve(image);
+          img.onerror = reject;
+        });
+      }
+
+      function renderThumbnails() {
+        setTimeout(function () {
+          const thumbnailGrid = document.getElementById("thumbnail-grid");
+          loveImages.forEach((image, index) => {
+            const img = document.createElement("img");
+            img.src = image.src;
+            img.alt = image.alt;
+            img.className = `w-full h-20 object-cover rounded-md cursor-pointer ${
+              index === currentImageIndex ? "ring-2 ring-pink-500" : ""
+            }`;
+            img.onclick = () => changeImage(index);
+            thumbnailGrid.appendChild(img);
+          });
+        }, 5000); // Espera 1 segundo antes de ejecutar
+      }
+
+      function renderCurrentImage() {
+        const currentImage = loveImages[currentImageIndex];
+        document.getElementById("current-image").src = currentImage.src;
+        document.getElementById("current-image").alt = currentImage.alt;
+      }
+
+      function nextImage() {
+        currentImageIndex = (currentImageIndex + 1) % loveImages.length;
+        renderCurrentImage();
+      }
+
+      function prevImage() {
+        currentImageIndex =
+          (currentImageIndex - 1 + loveImages.length) % loveImages.length;
+        renderCurrentImage();
+      }
+
+      function changeImage(index) {
+        currentImageIndex = index;
+        renderCurrentImage();
+      }
+
+      function openModal() {
+        const currentImage = loveImages[currentImageIndex];
+        document.getElementById("modal-image").src = currentImage.src;
+        document.getElementById("modal-image").alt = currentImage.alt;
+        document.getElementById("modal").classList.remove("hidden");
+      }
+
+      function closeModal() {
+        document.getElementById("modal").classList.add("hidden");
+      }
+
+      window.onload = () => {
+        loadImages();
+      };
+      function createHeart() {
+        // Crear un elemento <div> para el corazón
+        const heart = document.createElement("div");
+        heart.classList.add("heart");
+        heart.innerHTML = "❤️"; // Forma del corazón, puedes usar emojis o caracteres HTML
+
+        // Posición inicial aleatoria
+        heart.style.left = Math.random() * 100 + "vw";
+        heart.style.animationDuration = Math.random() * 3 + 2 + "s"; // Duración entre 2s y 5s
+        heart.style.fontSize = Math.random() * 15 + 10 + "px"; // Tamaño aleatorio entre 10px y 25px
+        heart.style.position = "fixed"; // Cambia a posición fija
+        heart.style.top = "-10px"; // Empieza ligeramente fuera de la pantalla
+
+        document.body.appendChild(heart);
+
+        // Eliminar el corazón después de que termine la animación
+        setTimeout(() => {
+          heart.remove();
+        }, 5000); // Coincide con la duración máxima de la animación
+      }
+
+      // Crear corazones a intervalos regulares
+      setInterval(createHeart, 300); // Genera un corazón cada 300ms
+
+      // Selecciona los elementos
+      const openModalBtn = document.getElementById("openModalBtn");
+      const closeModalBtn = document.getElementById("closeModalBtn");
+      const modal = document.getElementById("modal");
+
+      // Función para abrir el modal
+      openModalBtn.addEventListener("click", () => {
+        modal.style.display = "flex"; // Muestra el modal como flex para centrar contenido
+      });
+
+      // Función para cerrar el modal
+      closeModalBtn.addEventListener("click", () => {
+        modal.style.display = "none"; // Oculta el modal
+      });
+
+      // Cerrar el modal al hacer clic fuera de él
+      window.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          modal.style.display = "none";
+        }
+      });
+
+      const EMOJIS = ["❤️", "💖", "💕", "💓", "💗", "💘", "💝", "💞"];
+      let cards = [];
+      let flippedCards = [];
+      let moves = 0;
+      let completed = false;
+
+      const gameGrid = document.getElementById("gameGrid");
+      const moveCountDisplay = document.getElementById("moveCount");
+      const completionMessage = document.getElementById("completionMessage");
+
+      function initializeGame() {
+        const shuffledEmojis = [...EMOJIS, ...EMOJIS].sort(
+          () => Math.random() - 0.5
+        );
+        cards = shuffledEmojis.map((emoji, index) => ({
+          id: index,
+          emoji,
+          flipped: false,
+          matched: false,
+        }));
+
+        flippedCards = [];
+        moves = 0;
+        completed = false;
+        moveCountDisplay.textContent = moves;
+        completionMessage.textContent = "";
+
+        renderCards();
+      }
+
+      function renderCards() {
+        gameGrid.innerHTML = "";
+        cards.forEach((card, index) => {
+          const button = document.createElement("button");
+          button.className = `card-button ${
+            card.flipped || card.matched ? "flipped" : "unflipped"
+          }`;
+          button.textContent = card.flipped || card.matched ? card.emoji : "?";
+          button.onclick = () => handleCardClick(index);
+          gameGrid.appendChild(button);
+        });
+      }
+
+      function handleCardClick(id) {
+        if (flippedCards.length === 2 || cards[id].flipped || cards[id].matched)
+          return;
+
+        cards[id].flipped = true;
+        flippedCards.push(id);
+        renderCards();
+
+        if (flippedCards.length === 2) {
+          moves++;
+          moveCountDisplay.textContent = moves;
+          checkForMatch();
+        }
+      }
+
+      function checkForMatch() {
+        const [firstId, secondId] = flippedCards;
+        if (cards[firstId].emoji === cards[secondId].emoji) {
+          cards[firstId].matched = true;
+          cards[secondId].matched = true;
+          flippedCards = [];
+
+          if (cards.every((card) => card.matched)) {
+            completed = true;
+            completionMessage.textContent = `¡Felicidades bb! Has completado el juego en ${moves} movimientos.`;
+            let dd = document.getElementById("happy");
+            dd.style.display = "flex";
+          }
+        } else {
+          setTimeout(() => {
+            cards[firstId].flipped = false;
+            cards[secondId].flipped = false;
+            flippedCards = [];
+            renderCards();
+          }, 1000);
+        }
+      }
+
+      initializeGame();
+    </script>
+  </body>
+</html>
